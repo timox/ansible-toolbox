@@ -1,0 +1,15 @@
+---
+# =============================================================================
+# Role zabbix_agent - Handlers
+# =============================================================================
+
+- name: Restart zabbix-agent2
+  ansible.builtin.systemd:
+    name: zabbix-agent2
+    state: restarted
+    daemon_reload: true
+
+- name: Reload zabbix-agent2
+  ansible.builtin.systemd:
+    name: zabbix-agent2
+    state: reloaded

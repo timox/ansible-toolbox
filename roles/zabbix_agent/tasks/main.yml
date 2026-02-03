@@ -1,0 +1,38 @@
+---
+# =============================================================================
+# Role zabbix_agent - Task router
+# =============================================================================
+# Deploie Zabbix Agent 2 (v7.0) avec scripts de monitoring
+
+- name: Validate required variables
+  ansible.builtin.assert:
+    that:
+      - zabbix_agent_server | length > 0
+    fail_msg: "zabbix_agent_server doit etre defini (IP ou hostname du serveur Zabbix)"
+    quiet: true
+  tags:
+    - zabbix-agent
+    - zabbix-agent-validate
+
+- name: Install Zabbix Agent 2
+  ansible.builtin.include_tasks: install.yml
+  when: zabbix_agent_state == 'present'
+  tags:
+    - zabbix-agent
+    - zabbix-agent-install
+
+- name: Configure Zabbix Agent 2
+  ansible.builtin.include_tasks: configure.yml
+  when: zabbix_agent_state == 'present'
+  tags:
+    - zabbix-agent
+    - zabbix-agent-configure
+
+- name: Deploy monitoring scripts
+  ansible.builtin.include_tasks: monitoring_scripts.yml
+  when:
+    - zabbix_agent_state == 'present'
+    - zabbix_agent_install_scripts | bool
+  tags:
+    - zabbix-agent
+    - zabbix-agent-scripts

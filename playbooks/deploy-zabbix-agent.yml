@@ -1,0 +1,41 @@
+---
+# =============================================================================
+# DEPLOY-ZABBIX-AGENT.YML - Deploiement Zabbix Agent 2 (v7.0)
+# =============================================================================
+# Installe et configure Zabbix Agent 2 avec scripts de monitoring
+#
+# Usage:
+#   ansible-playbook playbooks/deploy-zabbix-agent.yml
+#   ansible-playbook playbooks/deploy-zabbix-agent.yml --check --diff
+#   ansible-playbook playbooks/deploy-zabbix-agent.yml --limit srv-web-01
+#   ansible-playbook playbooks/deploy-zabbix-agent.yml --tags zabbix-agent-scripts
+#
+# Variables obligatoires:
+#   zabbix_agent_server: IP ou hostname du serveur Zabbix
+# =============================================================================
+
+- name: Deploy Zabbix Agent 2
+  hosts: zabbix_agents
+  become: true
+  gather_facts: true
+
+  roles:
+    - role: zabbix_agent
+      tags:
+        - zabbix-agent
+
+  post_tasks:
+    - name: Verify zabbix-agent2 service status
+      ansible.builtin.systemd:
+        name: zabbix-agent2
+      register: _zabbix_service
+      tags:
+        - zabbix-agent
+        - verify
+
+    - name: Display agent status
+      ansible.builtin.debug:
+        msg: "zabbix-agent2: {{ _zabbix_service.status.ActiveState }} ({{ _zabbix_service.status.SubState }})"
+      tags:
+        - zabbix-agent
+        - verify

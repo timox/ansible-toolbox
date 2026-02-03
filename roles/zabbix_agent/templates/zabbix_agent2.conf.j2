@@ -1,0 +1,29 @@
+# {{ ansible_managed }}
+# =============================================================================
+# Zabbix Agent 2 - Configuration
+# =============================================================================
+# Genere par Ansible - NE PAS MODIFIER MANUELLEMENT
+
+# --- Serveur Zabbix ---
+Server={{ zabbix_agent_server }}
+ServerActive={{ zabbix_agent_server_active | default(zabbix_agent_server, true) }}
+Hostname={{ zabbix_agent_hostname }}
+ListenPort={{ zabbix_agent_listen_port }}
+
+# --- Logging ---
+LogType=system
+DebugLevel=3
+
+# --- Include ---
+Include=/etc/zabbix/zabbix_agent2.d/*.conf
+
+# --- Timeouts ---
+Timeout=30
+
+{% if zabbix_agent_psk_identity %}
+# --- TLS PSK ---
+TLSConnect=psk
+TLSAccept=psk
+TLSPSKIdentity={{ zabbix_agent_psk_identity }}
+TLSPSKFile=/etc/zabbix/zabbix_agent2.psk
+{% endif %}

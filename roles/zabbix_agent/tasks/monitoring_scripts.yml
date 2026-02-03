@@ -1,0 +1,44 @@
+---
+# =============================================================================
+# Role zabbix_agent - Scripts de monitoring et UserParameters
+# =============================================================================
+
+- name: Install script dependencies
+  ansible.builtin.apt:
+    name:
+      - curl
+      - bc
+      - dnsutils
+    state: present
+
+- name: Deploy monitoring scripts
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ zabbix_agent_scripts_dir }}/{{ item }}"
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - check-internet-connectivity.sh
+    - check-dns-response-time.sh
+    - check-http-response-time.sh
+    - check-internet-endpoints-stats.sh
+
+- name: Deploy UserParameter internet connectivity
+  ansible.builtin.copy:
+    src: userparameter_internet.conf
+    dest: /etc/zabbix/zabbix_agent2.d/userparameter_internet.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart zabbix-agent2
+
+- name: Deploy UserParameter custom sites
+  ansible.builtin.copy:
+    src: userparameter_custom_sites.conf
+    dest: /etc/zabbix/zabbix_agent2.d/userparameter_custom_sites.conf
+    owner: root
+    group: root
+    mode: "0644"
+  when: zabbix_agent_install_custom_sites | bool
+  notify: Restart zabbix-agent2

@@ -1,0 +1,33 @@
+---
+# =============================================================================
+# Role zabbix_agent - Configuration Zabbix Agent 2
+# =============================================================================
+
+- name: Ensure zabbix_agent2.d directory exists
+  ansible.builtin.file:
+    path: /etc/zabbix/zabbix_agent2.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy zabbix_agent2.conf
+  ansible.builtin.template:
+    src: zabbix_agent2.conf.j2
+    dest: /etc/zabbix/zabbix_agent2.conf
+    owner: root
+    group: root
+    mode: "0644"
+    backup: true
+  notify: Restart zabbix-agent2
+
+- name: Deploy PSK file
+  ansible.builtin.copy:
+    content: "{{ zabbix_agent_psk_value }}"
+    dest: /etc/zabbix/zabbix_agent2.psk
+    owner: zabbix
+    group: zabbix
+    mode: "0600"
+  when: zabbix_agent_psk_identity | length > 0
+  notify: Restart zabbix-agent2
+  no_log: true

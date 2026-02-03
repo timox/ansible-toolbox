@@ -1,0 +1,21 @@
+---
+# =============================================================================
+# Role zabbix_agent - Metadata
+# =============================================================================
+
+galaxy_info:
+  role_name: zabbix_agent
+  author: timox
+  description: Deploy Zabbix Agent 2 (v7.0) with monitoring scripts
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+    - name: Debian
+      versions:
+        - bookworm
+
+dependencies: []

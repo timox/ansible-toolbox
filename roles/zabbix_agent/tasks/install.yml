@@ -1,0 +1,43 @@
+---
+# =============================================================================
+# Role zabbix_agent - Installation Zabbix Agent 2 via repo officiel
+# =============================================================================
+
+- name: Determine OS distribution
+  ansible.builtin.set_fact:
+    _zabbix_os: "{{ 'ubuntu' if ansible_distribution == 'Ubuntu' else 'debian' }}"
+    _zabbix_codename: "{{ ansible_distribution_release }}"
+
+- name: Download Zabbix release package
+  ansible.builtin.get_url:
+    url: "https://repo.zabbix.com/zabbix/{{ zabbix_agent_version }}/{{ _zabbix_os }}/pool/main/z/zabbix-release/zabbix-release_latest_{{ zabbix_agent_version }}+{{ _zabbix_os }}{{ ansible_distribution_version }}_all.deb"
+    dest: /tmp/zabbix-release.deb
+    mode: "0644"
+
+- name: Install Zabbix release package
+  ansible.builtin.apt:
+    deb: /tmp/zabbix-release.deb
+    state: present
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+
+- name: Install Zabbix Agent 2
+  ansible.builtin.apt:
+    name:
+      - zabbix-agent2
+      - zabbix-agent2-plugin-*
+    state: present
+
+- name: Remove temporary release package
+  ansible.builtin.file:
+    path: /tmp/zabbix-release.deb
+    state: absent
+
+- name: Enable and start zabbix-agent2
+  ansible.builtin.systemd:
+    name: zabbix-agent2
+    enabled: true
+    state: started
+    daemon_reload: true
