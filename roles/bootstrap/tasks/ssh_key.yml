@@ -1,0 +1,26 @@
+---
+# ============================================================================
+# Deploy SSH public key for key-based authentication
+# ============================================================================
+
+- name: Ensure .ssh directory exists
+  ansible.builtin.file:
+    path: "/home/{{ ansible_user }}/.ssh"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0700"
+
+- name: Deploy SSH public key
+  ansible.posix.authorized_key:
+    user: "{{ ansible_user }}"
+    key: "{{ bootstrap_ssh_public_key }}"
+    state: present
+    exclusive: false
+
+- name: Verify SSH key is deployed
+  ansible.builtin.command:
+    cmd: "grep -c '{{ bootstrap_ssh_public_key | split(' ') | last }}' /home/{{ ansible_user }}/.ssh/authorized_keys"
+  register: ssh_key_check
+  changed_when: false
+  failed_when: ssh_key_check.rc != 0

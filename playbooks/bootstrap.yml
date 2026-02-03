@@ -1,0 +1,52 @@
+---
+# ============================================================================
+# Bootstrap playbook - Prepare a fresh server
+# ============================================================================
+# Usage:
+#   First run (password auth):
+#     ansible-playbook playbooks/bootstrap.yml --ask-pass
+#
+#   Subsequent runs (key auth):
+#     ansible-playbook playbooks/bootstrap.yml
+#
+#   Dry run:
+#     ansible-playbook playbooks/bootstrap.yml --check --diff
+#
+#   Skip hardening (first run, key only):
+#     ansible-playbook playbooks/bootstrap.yml --ask-pass --skip-tags hardening
+#
+#   Docker only:
+#     ansible-playbook playbooks/bootstrap.yml --tags docker
+# ============================================================================
+
+- name: Bootstrap server
+  hosts: remote
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Wait for server to be reachable
+      ansible.builtin.wait_for_connection:
+        timeout: 30
+
+    - name: Gather facts
+      ansible.builtin.setup:
+
+  roles:
+    - role: bootstrap
+      tags: [bootstrap]
+
+    - role: docker_setup
+      tags: [docker]
+
+  post_tasks:
+    - name: Display server info
+      ansible.builtin.debug:
+        msg:
+          - "Hostname: {{ ansible_hostname }}"
+          - "OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+          - "Kernel: {{ ansible_kernel }}"
+          - "IP: {{ ansible_default_ipv4.address | default('N/A') }}"
+          - "RAM: {{ ansible_memtotal_mb }}MB"
+          - "Disk: {{ ansible_mounts | selectattr('mount', 'equalto', '/') | map(attribute='size_total') | first | human_readable }}"
+      tags: [always]

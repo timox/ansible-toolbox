@@ -1,0 +1,31 @@
+---
+# ============================================================================
+# Configure Docker daemon
+# ============================================================================
+
+- name: Create Docker daemon configuration
+  ansible.builtin.copy:
+    content: |
+      {
+        "log-driver": "{{ docker_log_driver }}",
+        "log-opts": {
+          "max-size": "{{ docker_log_max_size }}",
+          "max-file": "{{ docker_log_max_file }}"
+        },
+        "storage-driver": "{{ docker_storage_driver }}",
+        "data-root": "{{ docker_data_root }}",
+        "live-restore": {{ docker_live_restore | lower }}
+      }
+    dest: /etc/docker/daemon.json
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart docker
+
+- name: Setup weekly Docker prune cron
+  ansible.builtin.cron:
+    name: "Docker system prune"
+    job: "docker system prune -af --volumes --filter 'until=168h' > /dev/null 2>&1"
+    special_time: weekly
+    user: root
+    state: "{{ docker_prune_enabled | ternary('present', 'absent') }}"

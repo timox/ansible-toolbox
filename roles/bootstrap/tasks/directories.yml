@@ -1,0 +1,13 @@
+---
+# ============================================================================
+# Create data directories
+# ============================================================================
+
+- name: Create data directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ bootstrap_directories_owner }}"
+    group: "{{ bootstrap_directories_group }}"
+    mode: "{{ bootstrap_directories_mode }}"
+  loop: "{{ bootstrap_directories }}"

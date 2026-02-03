@@ -1,0 +1,38 @@
+---
+# ============================================================================
+# Bootstrap role defaults
+# ============================================================================
+
+# SSH key deployment
+bootstrap_deploy_ssh_key: true
+bootstrap_ssh_public_key: "{{ vault_ssh_public_key }}"
+
+# System packages
+bootstrap_install_packages: true
+bootstrap_packages: "{{ base_packages }}"
+
+# Directories
+bootstrap_create_directories: true
+bootstrap_directories: "{{ data_directories }}"
+bootstrap_directories_owner: "{{ ansible_user }}"
+bootstrap_directories_group: "{{ ansible_user }}"
+bootstrap_directories_mode: "0755"
+
+# System settings
+bootstrap_configure_system: true
+bootstrap_timezone: "{{ timezone }}"
+bootstrap_hostname: "{{ inventory_hostname }}"
+bootstrap_locale: "en_US.UTF-8"
+
+# SSH hardening
+bootstrap_harden_ssh: true
+bootstrap_ssh_port: "{{ ssh_port }}"
+bootstrap_ssh_permit_root_login: "{{ ssh_permit_root_login }}"
+bootstrap_ssh_password_authentication: "{{ ssh_password_authentication }}"
+bootstrap_ssh_pubkey_authentication: "{{ ssh_pubkey_authentication }}"
+bootstrap_ssh_max_auth_tries: "{{ ssh_max_auth_tries }}"
+
+# Swap
+bootstrap_configure_swap: true
+bootstrap_swap_size: "2G"
+bootstrap_swap_path: /swapfile

@@ -1,0 +1,23 @@
+# Vault password
+.vault-password
+
+# SSH keys
+*.pem
+id_ansible_toolbox
+id_ansible_toolbox.pub
+
+# Ansible
+*.retry
+/tmp/
+/fact_cache/
+
+# Editor
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

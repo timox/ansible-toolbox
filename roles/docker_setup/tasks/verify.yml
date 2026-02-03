@@ -1,0 +1,28 @@
+---
+# ============================================================================
+# Verify Docker installation status
+# ============================================================================
+
+- name: Check if Docker is already installed
+  ansible.builtin.command:
+    cmd: docker --version
+  register: docker_installed
+  changed_when: false
+  failed_when: false
+
+- name: Display Docker version if installed
+  ansible.builtin.debug:
+    msg: "Docker is already installed: {{ docker_installed.stdout }}"
+  when: docker_installed.rc == 0
+
+- name: Check Docker Compose
+  ansible.builtin.command:
+    cmd: docker compose version
+  register: compose_installed
+  changed_when: false
+  failed_when: false
+
+- name: Display Compose version if installed
+  ansible.builtin.debug:
+    msg: "Docker Compose: {{ compose_installed.stdout }}"
+  when: compose_installed.rc == 0

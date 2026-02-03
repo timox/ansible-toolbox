@@ -1,0 +1,29 @@
+---
+# ============================================================================
+# Bootstrap role - Main task router
+# ============================================================================
+
+- name: Deploy SSH key
+  ansible.builtin.include_tasks: ssh_key.yml
+  when: bootstrap_deploy_ssh_key | bool
+  tags: [ssh, bootstrap]
+
+- name: Install prerequisites
+  ansible.builtin.include_tasks: prerequisites.yml
+  when: bootstrap_install_packages | bool
+  tags: [packages, bootstrap]
+
+- name: Configure system
+  ansible.builtin.include_tasks: system.yml
+  when: bootstrap_configure_system | bool
+  tags: [system, bootstrap]
+
+- name: Create directories
+  ansible.builtin.include_tasks: directories.yml
+  when: bootstrap_create_directories | bool
+  tags: [directories, bootstrap]
+
+- name: Harden SSH
+  ansible.builtin.include_tasks: hardening.yml
+  when: bootstrap_harden_ssh | bool
+  tags: [hardening, ssh, bootstrap]

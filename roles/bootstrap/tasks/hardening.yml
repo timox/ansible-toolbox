@@ -1,0 +1,24 @@
+---
+# ============================================================================
+# SSH hardening
+# IMPORTANT: This disables password authentication.
+# Only run AFTER SSH key has been successfully deployed.
+# ============================================================================
+
+- name: Verify SSH key-based login works before hardening
+  ansible.builtin.assert:
+    that:
+      - bootstrap_ssh_public_key != "CHANGEME"
+      - bootstrap_ssh_public_key | length > 20
+    fail_msg: "SSH public key must be set before hardening. Run SSH key deployment first."
+
+- name: Deploy hardened sshd_config
+  ansible.builtin.template:
+    src: sshd_config_hardened.j2
+    dest: /etc/ssh/sshd_config
+    owner: root
+    group: root
+    mode: "0600"
+    validate: "sshd -t -f %s"
+    backup: true
+  notify: Restart sshd

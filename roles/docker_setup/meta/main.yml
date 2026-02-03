@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  role_name: docker_setup
+  author: timox
+  description: Install and configure Docker CE with Compose plugin
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+    - name: Debian
+      versions:
+        - bookworm
+dependencies: []

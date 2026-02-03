@@ -1,0 +1,83 @@
+---
+# ============================================================================
+# Check playbook - Verify server connectivity and state
+# ============================================================================
+# Usage:
+#   ansible-playbook playbooks/check.yml
+# ============================================================================
+
+- name: Check server state
+  hosts: remote
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Display system info
+      ansible.builtin.debug:
+        msg:
+          - "--- System ---"
+          - "Hostname: {{ ansible_hostname }}"
+          - "OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+          - "Kernel: {{ ansible_kernel }}"
+          - "Uptime: {{ ansible_uptime_seconds | int // 86400 }}d {{ (ansible_uptime_seconds | int % 86400) // 3600 }}h"
+          - "--- Network ---"
+          - "IP: {{ ansible_default_ipv4.address | default('N/A') }}"
+          - "--- Resources ---"
+          - "RAM: {{ ansible_memfree_mb }}MB free / {{ ansible_memtotal_mb }}MB total"
+          - "Swap: {{ ansible_swaptotal_mb }}MB"
+
+    - name: Check disk usage
+      ansible.builtin.command:
+        cmd: df -h /
+      register: disk_usage
+      changed_when: false
+
+    - name: Display disk usage
+      ansible.builtin.debug:
+        msg: "{{ disk_usage.stdout_lines }}"
+
+    - name: Check Docker status
+      ansible.builtin.shell:
+        cmd: "docker info --format '{{ '{{' }} .ServerVersion {{ '}}' }}'"
+      register: docker_version
+      changed_when: false
+      failed_when: false
+
+    - name: Display Docker status
+      ansible.builtin.debug:
+        msg: "Docker: {{ docker_version.stdout | default('Not installed') }}"
+
+    - name: Check running containers
+      ansible.builtin.shell:
+        cmd: "docker ps --format '{{ '{{' }} .Names {{ '}}' }} - {{ '{{' }} .Status {{ '}}' }}'"
+      register: docker_containers
+      changed_when: false
+      failed_when: false
+
+    - name: Display running containers
+      ansible.builtin.debug:
+        msg: "{{ docker_containers.stdout_lines | default(['No containers running']) }}"
+
+    - name: Check SSH auth methods
+      ansible.builtin.command:
+        cmd: grep -E "^(PasswordAuthentication|PubkeyAuthentication)" /etc/ssh/sshd_config
+      register: ssh_config
+      changed_when: false
+      failed_when: false
+
+    - name: Display SSH config
+      ansible.builtin.debug:
+        msg: "{{ ssh_config.stdout_lines | default(['Could not read SSH config']) }}"
+
+    - name: Check data directories
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop: "{{ data_directories }}"
+      register: dir_check
+
+    - name: Display directory status
+      ansible.builtin.debug:
+        msg: "{{ item.item }}: {{ item.stat.exists | ternary('EXISTS', 'MISSING') }}"
+      loop: "{{ dir_check.results }}"
+      loop_control:
+        label: "{{ item.item }}"

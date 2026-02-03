@@ -1,0 +1,35 @@
+# {{ ansible_managed }}
+# SSH hardened configuration - managed by Ansible
+
+Port {{ bootstrap_ssh_port }}
+AddressFamily any
+ListenAddress 0.0.0.0
+ListenAddress ::
+
+# Authentication
+PermitRootLogin {{ bootstrap_ssh_permit_root_login }}
+PubkeyAuthentication {{ bootstrap_ssh_pubkey_authentication }}
+PasswordAuthentication {{ bootstrap_ssh_password_authentication }}
+PermitEmptyPasswords no
+ChallengeResponseAuthentication no
+MaxAuthTries {{ bootstrap_ssh_max_auth_tries }}
+MaxSessions 10
+AuthenticationMethods publickey
+
+# Security
+X11Forwarding no
+AllowTcpForwarding yes
+AllowAgentForwarding yes
+PrintMotd no
+PrintLastLog yes
+TCPKeepAlive yes
+ClientAliveInterval 300
+ClientAliveCountMax 2
+UseDNS no
+
+# Logging
+SyslogFacility AUTH
+LogLevel VERBOSE
+
+# SFTP
+Subsystem sftp /usr/lib/openssh/sftp-server

@@ -1,0 +1,18 @@
+---
+# ============================================================================
+# Docker setup role - Main task router
+# ============================================================================
+
+- name: Check if Docker is installed
+  ansible.builtin.include_tasks: verify.yml
+  tags: [docker, verify]
+
+- name: Install Docker
+  ansible.builtin.include_tasks: install.yml
+  when: docker_install | bool
+  tags: [docker, install]
+
+- name: Configure Docker
+  ansible.builtin.include_tasks: configure.yml
+  when: docker_configure_daemon | bool
+  tags: [docker, configure]

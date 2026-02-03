@@ -1,0 +1,25 @@
+---
+# ============================================================================
+# Install base packages
+# ============================================================================
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Upgrade all packages
+  ansible.builtin.apt:
+    upgrade: safe
+  register: apt_upgrade
+  tags: [upgrade]
+
+- name: Install base packages
+  ansible.builtin.apt:
+    name: "{{ bootstrap_packages }}"
+    state: present
+
+- name: Remove unnecessary packages
+  ansible.builtin.apt:
+    autoremove: true
+    purge: true

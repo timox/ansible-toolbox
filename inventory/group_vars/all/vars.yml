@@ -1,0 +1,58 @@
+---
+# ============================================================================
+# General
+# ============================================================================
+timezone: Europe/Paris
+data_dir: /data
+
+# ============================================================================
+# SSH
+# ============================================================================
+ssh_port: 22
+ssh_permit_root_login: "no"
+ssh_password_authentication: "no"
+ssh_pubkey_authentication: "yes"
+ssh_max_auth_tries: 3
+
+# ============================================================================
+# System packages
+# ============================================================================
+base_packages:
+  - curl
+  - wget
+  - git
+  - vim
+  - htop
+  - tmux
+  - unzip
+  - jq
+  - tree
+  - net-tools
+  - dnsutils
+  - ca-certificates
+  - gnupg
+  - lsb-release
+  - apt-transport-https
+  - software-properties-common
+  - python3-pip
+  - fail2ban
+  - ufw
+
+# ============================================================================
+# Directories to create
+# ============================================================================
+data_directories:
+  - "{{ data_dir }}"
+  - "{{ data_dir }}/backups"
+  - "{{ data_dir }}/certs"
+  - "{{ data_dir }}/docker"
+  - "{{ data_dir }}/logs"
+
+# ============================================================================
+# Docker
+# ============================================================================
+docker_users:
+  - "{{ ansible_user }}"
+docker_compose_version: "v2.32.4"
+docker_log_max_size: "10m"
+docker_log_max_file: "3"

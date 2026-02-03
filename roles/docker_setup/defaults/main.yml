@@ -1,0 +1,30 @@
+---
+# ============================================================================
+# Docker setup role defaults
+# ============================================================================
+
+# Installation
+docker_install: true
+docker_edition: "ce"
+docker_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-compose-plugin
+
+# Users to add to docker group
+docker_users: []
+
+# Daemon configuration
+docker_configure_daemon: true
+docker_log_driver: "json-file"
+docker_log_max_size: "10m"
+docker_log_max_file: "3"
+docker_storage_driver: "overlay2"
+docker_data_root: "/var/lib/docker"
+docker_live_restore: true
+
+# Prune cron
+docker_prune_enabled: true
+docker_prune_schedule: "0 3 * * 0"  # Sunday 3am
