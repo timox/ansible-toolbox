@@ -1,0 +1,21 @@
+---
+# =============================================================================
+# Role cisco_backup - Metadata
+# =============================================================================
+
+galaxy_info:
+  role_name: cisco_backup
+  author: timox
+  description: Backup Cisco IOS/IOS-XE running-config and commit to Git
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+    - name: Debian
+      versions:
+        - bookworm
+
+dependencies: []

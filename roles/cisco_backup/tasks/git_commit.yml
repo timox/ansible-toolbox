@@ -1,0 +1,82 @@
+---
+# =============================================================================
+# Role cisco_backup - Git commit/push des backups
+# =============================================================================
+# Delegue a localhost, execute une seule fois apres tous les backups
+
+- name: Stage backup files in Git
+  ansible.builtin.command:
+    cmd: git add backups/
+    chdir: "{{ playbook_dir }}/.."
+  register: git_add_result
+  changed_when: false
+  delegate_to: localhost
+  become: false
+  run_once: true
+  tags:
+    - cisco-backup-git
+
+- name: Check for staged changes
+  ansible.builtin.command:
+    cmd: git diff --cached --quiet
+    chdir: "{{ playbook_dir }}/.."
+  register: git_diff_result
+  changed_when: false
+  failed_when: false
+  delegate_to: localhost
+  become: false
+  run_once: true
+  tags:
+    - cisco-backup-git
+
+- name: Count backed up devices
+  ansible.builtin.find:
+    paths: "{{ cisco_backup_dir }}"
+    patterns: "*.cfg"
+  register: backup_files
+  delegate_to: localhost
+  become: false
+  run_once: true
+  tags:
+    - cisco-backup-git
+
+- name: Commit backup changes
+  ansible.builtin.command:
+    cmd: >-
+      git commit -m "backup: {{ ansible_date_time.date }} {{ ansible_date_time.time }} - {{ backup_files.matched }} configs"
+    chdir: "{{ playbook_dir }}/.."
+  register: git_commit_result
+  when: git_diff_result.rc != 0
+  delegate_to: localhost
+  become: false
+  run_once: true
+  tags:
+    - cisco-backup-git
+
+- name: Push to remote
+  ansible.builtin.command:
+    cmd: "git push origin {{ cisco_backup_git_branch }}"
+    chdir: "{{ playbook_dir }}/.."
+  when:
+    - cisco_backup_git_push | bool
+    - git_diff_result.rc != 0
+  delegate_to: localhost
+  become: false
+  run_once: true
+  tags:
+    - cisco-backup-git
+
+- name: Display Git result
+  ansible.builtin.debug:
+    msg: >-
+      {% if git_diff_result.rc != 0 %}
+      Git commit: {{ backup_files.matched }} configs committed and
+      {% if cisco_backup_git_push | bool %}pushed{% else %}not pushed (git_push disabled){% endif %}
+      {% else %}
+      No changes detected - configs unchanged since last backup
+      {% endif %}
+  delegate_to: localhost
+  become: false
+  run_once: true
+  tags:
+    - cisco-backup-git

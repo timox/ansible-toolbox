@@ -1,0 +1,21 @@
+---
+# =============================================================================
+# Variables groupe network - Equipements Cisco IOS/IOS-XE
+# =============================================================================
+
+# Connection reseau Cisco
+ansible_connection: ansible.netcommon.network_cli
+ansible_network_os: cisco.ios.ios
+ansible_port: 22
+ansible_become: true
+ansible_become_method: enable
+
+# Credentials: definir via Semaphore Key Store, vault, ou extra-vars
+# ansible_user: ""
+# ansible_password: ""
+# ansible_become_password: ""
+
+# Backup
+cisco_backup_dir: "{{ playbook_dir }}/../backups"
+cisco_backup_git_push: true
+cisco_backup_git_branch: main

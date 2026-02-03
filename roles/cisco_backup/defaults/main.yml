@@ -1,0 +1,26 @@
+---
+# =============================================================================
+# Role cisco_backup - Valeurs par defaut
+# =============================================================================
+# Variables configurables pour la sauvegarde des configs Cisco IOS/IOS-XE
+
+# Repertoire de sauvegarde (relatif au repo ansible)
+cisco_backup_dir: "{{ playbook_dir }}/../backups"
+
+# Nom du fichier de sauvegarde par equipement
+cisco_backup_filename: "{{ inventory_hostname }}.cfg"
+
+# Git: commit automatique apres backup
+cisco_backup_git_commit: true
+
+# Git: push automatique apres commit
+cisco_backup_git_push: true
+
+# Git: branche cible
+cisco_backup_git_branch: main
+
+# Commande IOS pour recuperer la config
+cisco_backup_command: "show running-config"
+
+# Collecter aussi la version (metadata)
+cisco_backup_show_version: true
