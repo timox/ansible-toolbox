@@ -6,6 +6,9 @@
 id_ansible_toolbox
 id_ansible_toolbox.pub
 
+# Semaphore
+semaphore/.env
+
 # Ansible
 *.retry
 /tmp/
