@@ -1,0 +1,35 @@
+---
+# =============================================================================
+# Role zabbix_agent - Valeurs par defaut
+# =============================================================================
+# Variables configurables pour le deploiement de Zabbix Agent 2 (v7.0)
+
+# Etat du role (present ou absent)
+zabbix_agent_state: present
+
+# Version majeure Zabbix (branche repo apt)
+zabbix_agent_version: "7.0"
+
+# --- Serveur Zabbix ---
+# IP ou hostname du serveur Zabbix (OBLIGATOIRE)
+zabbix_agent_server: ""
+# Serveur pour checks actifs (si vide, utilise zabbix_agent_server)
+zabbix_agent_server_active: ""
+# Hostname de l'agent (tel qu'enregistre dans Zabbix)
+zabbix_agent_hostname: "{{ inventory_hostname }}"
+# Port d'ecoute de l'agent
+zabbix_agent_listen_port: 10050
+
+# --- TLS PSK (optionnel) ---
+# Identity PSK pour chiffrement agent <-> serveur
+zabbix_agent_psk_identity: ""
+# Contenu de la cle PSK (stocker dans vault)
+zabbix_agent_psk_value: ""
+
+# --- Scripts de monitoring ---
+# Installer les scripts check-* et UserParameters
+zabbix_agent_install_scripts: true
+# Repertoire d'installation des scripts
+zabbix_agent_scripts_dir: /usr/local/bin
+# Installer aussi userparameter_custom_sites.conf
+zabbix_agent_install_custom_sites: false

@@ -1,0 +1,25 @@
+---
+# =============================================================================
+# BACKUP-CISCO.YML - Sauvegarde configs Cisco IOS/IOS-XE
+# =============================================================================
+# Recupere les running-config des switchs Cisco et commit dans Git
+#
+# Usage:
+#   ansible-playbook playbooks/backup-cisco.yml
+#   ansible-playbook playbooks/backup-cisco.yml --check
+#   ansible-playbook playbooks/backup-cisco.yml --limit sw-core-01
+#   ansible-playbook playbooks/backup-cisco.yml -e cisco_backup_git_push=false
+#
+# Prerequis:
+#   ansible-galaxy collection install -r requirements.yml
+#   Credentials dans Semaphore Key Store ou -e ansible_user=xxx -e ansible_password=xxx
+# =============================================================================
+
+- name: Backup Cisco IOS/IOS-XE running-config
+  hosts: network
+  gather_facts: false
+
+  roles:
+    - role: cisco_backup
+      tags:
+        - cisco-backup

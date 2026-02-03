@@ -1,0 +1,59 @@
+---
+# =============================================================================
+# Role cisco_backup - Recuperer running-config
+# =============================================================================
+
+- name: Ensure backup directory exists
+  ansible.builtin.file:
+    path: "{{ cisco_backup_dir }}"
+    state: directory
+    mode: '0755'
+  delegate_to: localhost
+  become: false
+  run_once: true
+  tags:
+    - cisco-backup-fetch
+
+- name: Retrieve running-config
+  cisco.ios.ios_command:
+    commands:
+      - "{{ cisco_backup_command }}"
+  register: cisco_running_config
+  tags:
+    - cisco-backup-fetch
+
+- name: Retrieve show version
+  cisco.ios.ios_command:
+    commands:
+      - show version
+  register: cisco_version
+  when: cisco_backup_show_version | bool
+  tags:
+    - cisco-backup-fetch
+
+- name: Save running-config to file
+  ansible.builtin.copy:
+    content: "{{ cisco_running_config.stdout[0] }}\n"
+    dest: "{{ cisco_backup_dir }}/{{ cisco_backup_filename }}"
+    mode: '0644'
+  delegate_to: localhost
+  become: false
+  tags:
+    - cisco-backup-fetch
+
+- name: Save version info to file
+  ansible.builtin.copy:
+    content: "{{ cisco_version.stdout[0] }}\n"
+    dest: "{{ cisco_backup_dir }}/{{ inventory_hostname }}.version"
+    mode: '0644'
+  delegate_to: localhost
+  become: false
+  when: cisco_backup_show_version | bool
+  tags:
+    - cisco-backup-fetch
+
+- name: Display backup status
+  ansible.builtin.debug:
+    msg: "Backup saved: {{ cisco_backup_dir }}/{{ cisco_backup_filename }}"
+  tags:
+    - cisco-backup-fetch

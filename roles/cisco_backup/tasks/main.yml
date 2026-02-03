@@ -1,0 +1,19 @@
+---
+# =============================================================================
+# Role cisco_backup - Task router
+# =============================================================================
+# Sauvegarde running-config des equipements Cisco IOS/IOS-XE
+# puis commit/push dans le repo Git
+
+- name: Backup running-config from Cisco devices
+  ansible.builtin.include_tasks: backup.yml
+  tags:
+    - cisco-backup
+    - cisco-backup-fetch
+
+- name: Commit backups to Git
+  ansible.builtin.include_tasks: git_commit.yml
+  when: cisco_backup_git_commit | bool
+  tags:
+    - cisco-backup
+    - cisco-backup-git

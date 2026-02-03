@@ -1,0 +1,17 @@
+---
+# =============================================================================
+# Variables groupe zabbix_agents
+# =============================================================================
+
+# Serveur Zabbix (OBLIGATOIRE - adapter a votre environnement)
+zabbix_agent_server: "10.0.0.50"
+
+# Installer les scripts de monitoring internet
+zabbix_agent_install_scripts: true
+
+# Decommenter pour activer le monitoring de sites personnalises
+# zabbix_agent_install_custom_sites: true
+
+# Decommenter pour activer TLS PSK (stocker la cle dans vault)
+# zabbix_agent_psk_identity: "PSK-{{ inventory_hostname }}"
+# zabbix_agent_psk_value: "{{ vault_zabbix_psk_value }}"
