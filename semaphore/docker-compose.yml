@@ -1,0 +1,46 @@
+services:
+  semaphore-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${SEMAPHORE_DB_USER}
+      POSTGRES_PASSWORD: ${SEMAPHORE_DB_PASS}
+      POSTGRES_DB: ${SEMAPHORE_DB_NAME}
+    volumes:
+      - semaphore-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SEMAPHORE_DB_USER} -d ${SEMAPHORE_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  semaphore:
+    build:
+      context: ..
+      dockerfile: semaphore/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${SEMAPHORE_PORT:-3000}:3000"
+    environment:
+      SEMAPHORE_DB_DIALECT: postgres
+      SEMAPHORE_DB_HOST: semaphore-db
+      SEMAPHORE_DB_PORT: 5432
+      SEMAPHORE_DB_USER: ${SEMAPHORE_DB_USER}
+      SEMAPHORE_DB_PASS: ${SEMAPHORE_DB_PASS}
+      SEMAPHORE_DB: ${SEMAPHORE_DB_NAME}
+      SEMAPHORE_ADMIN: ${SEMAPHORE_ADMIN_USER}
+      SEMAPHORE_ADMIN_NAME: ${SEMAPHORE_ADMIN_NAME}
+      SEMAPHORE_ADMIN_EMAIL: ${SEMAPHORE_ADMIN_EMAIL}
+      SEMAPHORE_ADMIN_PASSWORD: ${SEMAPHORE_ADMIN_PASSWORD}
+      SEMAPHORE_ACCESS_KEY_ENCRYPTION: ${SEMAPHORE_ACCESS_KEY_ENCRYPTION}
+    volumes:
+      - semaphore-data:/tmp/semaphore
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /data:/data
+    depends_on:
+      semaphore-db:
+        condition: service_healthy
+
+volumes:
+  semaphore-db-data:
+  semaphore-data:

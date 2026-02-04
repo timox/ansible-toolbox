@@ -1,374 +1,742 @@
-#!/bin/bash
-# =============================================================================
-# setup-semaphore.sh - Import ansible-toolbox project into Semaphore via API
-# =============================================================================
-# Creates project, keys, repository, inventory, environment, and task templates
+#!/usr/bin/env bash
+# ==============================================================================
+# setup-semaphore.sh - Provision des projets Semaphore via API
 #
-# Usage:
-#   ./semaphore/setup-semaphore.sh
-#   SEMAPHORE_URL=http://10.0.0.5:3000 ./semaphore/setup-semaphore.sh
+# Cree 4 projets avec keys, repository, inventaire, environnement et templates :
+#   - Infrastructure       : bootstrap, check serveurs
+#   - Portail Securise     : deploy/destroy stack portail
+#   - Monitoring           : Zabbix agent
+#   - Network Backup       : sauvegarde configs Cisco
 #
-# Prerequisites:
-#   - Semaphore running and accessible
-#   - curl and jq installed
-#   - .env file configured (see semaphore/.env.example)
-# =============================================================================
+# Usage : ./semaphore/setup-semaphore.sh
+# ==============================================================================
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# --- Charger la configuration ---
-ENV_FILE="${SCRIPT_DIR}/.env"
-if [ ! -f "$ENV_FILE" ]; then
-    echo "ERREUR: ${ENV_FILE} introuvable"
-    echo "Copier .env.example et configurer : cp semaphore/.env.example semaphore/.env"
-    exit 1
-fi
-# shellcheck source=/dev/null
-source "$ENV_FILE"
-
-# --- Variables obligatoires ---
-SEMAPHORE_URL="${SEMAPHORE_URL:?SEMAPHORE_URL requis dans .env}"
-SEMAPHORE_ADMIN_USER="${SEMAPHORE_ADMIN_USER:?SEMAPHORE_ADMIN_USER requis}"
-SEMAPHORE_ADMIN_PASSWORD="${SEMAPHORE_ADMIN_PASSWORD:?SEMAPHORE_ADMIN_PASSWORD requis}"
-GIT_REPO_URL="${GIT_REPO_URL:-https://github.com/timox/ansible-toolbox.git}"
-GIT_BRANCH="${GIT_BRANCH:-main}"
-PROJECT_NAME="${PROJECT_NAME:-Ansible Toolbox}"
-
-# --- Couleurs ---
-GREEN='\033[0;32m'
+# --- Couleurs ----------------------------------------------------------------
 RED='\033[0;31m'
+GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m'
 
-ok()   { echo -e "${GREEN}[OK]${NC} $1"; }
-fail() { echo -e "${RED}[FAIL]${NC} $1"; exit 1; }
-info() { echo -e "${YELLOW}[INFO]${NC} $1"; }
+# --- Charger .env ------------------------------------------------------------
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="${SCRIPT_DIR}/.env"
 
-# --- Fonctions API ---
+if [ ! -f "$ENV_FILE" ]; then
+    echo -e "${RED}Erreur: ${ENV_FILE} introuvable${NC}"
+    echo "Copier .env.example vers .env et configurer les valeurs."
+    exit 1
+fi
+
+# shellcheck disable=SC1090
+source "$ENV_FILE"
+
+# --- Variables ---------------------------------------------------------------
+SEMAPHORE_URL="http://localhost:${SEMAPHORE_PORT:-3000}"
+API="${SEMAPHORE_URL}/api"
+
+# Noms des projets (configurables dans .env)
+PROJECT_INFRA="${PROJECT_INFRA:-Infrastructure}"
+PROJECT_PORTAL="${PROJECT_PORTAL:-Portail Securise}"
+PROJECT_MONITORING="${PROJECT_MONITORING:-Monitoring}"
+PROJECT_NETWORK="${PROJECT_NETWORK:-Network Backup}"
+
+# Git
+GIT_URL="${GIT_REPO_URL:-https://github.com/timox/ansible-toolbox.git}"
+GIT_BRANCH="${GIT_BRANCH:-main}"
+
+# Chemins playbooks et inventaire (relatifs a la racine du repo)
+PLAYBOOK_DIR="playbooks"
+INVENTORY_PATH="inventory/hosts.yml"
+
+# Token API (rempli par authenticate)
 TOKEN=""
 
-api_login() {
-    info "Authentification aupres de Semaphore..."
-    local response
-    response=$(curl -s -w "\n%{http_code}" -X POST "${SEMAPHORE_URL}/api/auth/login" \
-        -H "Content-Type: application/json" \
-        -H "Accept: application/json" \
-        -c /tmp/semaphore-cookies \
-        -d "{\"auth\": \"${SEMAPHORE_ADMIN_USER}\", \"password\": \"${SEMAPHORE_ADMIN_PASSWORD}\"}")
+# --- Fonctions utilitaires ---------------------------------------------------
 
-    local http_code
-    http_code=$(echo "$response" | tail -1)
-    [ "$http_code" = "204" ] || fail "Login echoue (HTTP ${http_code})"
-    ok "Connecte a Semaphore"
-}
+log_info()  { echo -e "${BLUE}[INFO]${NC} $*"; }
+log_ok()    { echo -e "${GREEN}[OK]${NC} $*"; }
+log_warn()  { echo -e "${YELLOW}[WARN]${NC} $*"; }
+log_error() { echo -e "${RED}[ERROR]${NC} $*"; }
+log_section() { echo -e "\n${BLUE}=== $* ===${NC}"; }
 
-api_get() {
-    curl -s -b /tmp/semaphore-cookies -H "Accept: application/json" "${SEMAPHORE_URL}$1"
-}
+# Appel API generique
+api_call() {
+    local method="$1"
+    local endpoint="$2"
+    local data="${3:-}"
 
-api_post() {
-    local endpoint="$1"
-    local data="$2"
-    local response
-    response=$(curl -s -w "\n%{http_code}" -b /tmp/semaphore-cookies \
-        -X POST "${SEMAPHORE_URL}${endpoint}" \
-        -H "Content-Type: application/json" \
-        -H "Accept: application/json" \
-        -d "$data")
+    local args=(-s -f -X "$method"
+        -H "Content-Type: application/json"
+        -H "Accept: application/json"
+        -H "Authorization: Bearer ${TOKEN}")
 
-    local http_code body
-    http_code=$(echo "$response" | tail -1)
-    body=$(echo "$response" | sed '$d')
-
-    if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
-        echo "$body"
-    else
-        echo "ERREUR HTTP ${http_code}: ${body}" >&2
-        return 1
+    if [ -n "$data" ]; then
+        args+=(-d "$data")
     fi
+
+    curl "${args[@]}" "${API}${endpoint}" 2>/dev/null
 }
 
-# --- Trouver ou creer une ressource ---
-find_or_create() {
-    local resource_type="$1"  # keys, repositories, inventory, environment, templates
+# --- Authentification --------------------------------------------------------
+
+authenticate() {
+    log_info "Authentification aupres de Semaphore..."
+
+    local response
+    response=$(curl -s -f -X POST \
+        -H "Content-Type: application/json" \
+        -d "{\"auth\":\"${SEMAPHORE_ADMIN_USER}\",\"password\":\"${SEMAPHORE_ADMIN_PASSWORD}\"}" \
+        "${API}/auth/login" 2>/dev/null) || {
+        log_error "Impossible de se connecter a Semaphore (${SEMAPHORE_URL})"
+        log_error "Verifier que Semaphore est demarre et que les credentials sont corrects."
+        exit 1
+    }
+
+    # Creer un token API via cookie jar
+    local cookie_jar
+    cookie_jar=$(mktemp)
+    curl -s -f -X POST \
+        -H "Content-Type: application/json" \
+        -c "$cookie_jar" \
+        -d "{\"auth\":\"${SEMAPHORE_ADMIN_USER}\",\"password\":\"${SEMAPHORE_ADMIN_PASSWORD}\"}" \
+        "${API}/auth/login" >/dev/null 2>&1
+
+    TOKEN=$(curl -s -f -X POST \
+        -H "Content-Type: application/json" \
+        -H "Accept: application/json" \
+        -b "$cookie_jar" \
+        "${API}/user/tokens" 2>/dev/null | jq -r '.id // empty') || true
+
+    rm -f "$cookie_jar"
+
+    if [ -z "$TOKEN" ]; then
+        log_error "Impossible d'obtenir un token API."
+        exit 1
+    fi
+
+    log_ok "Authentifie (token: ${TOKEN:0:8}...)"
+}
+
+# --- Creation de ressources --------------------------------------------------
+
+# Cherche un projet par nom, retourne l'ID ou vide
+find_project() {
+    local name="$1"
+    api_call GET "/projects" | jq -r ".[] | select(.name==\"${name}\") | .id // empty" 2>/dev/null || true
+}
+
+# Cree un projet, retourne l'ID
+create_project() {
+    local name="$1"
+    local existing
+    existing=$(find_project "$name")
+
+    if [ -n "$existing" ]; then
+        log_warn "Projet '${name}' existe deja (id: ${existing})"
+        echo "$existing"
+        return
+    fi
+
+    local result
+    result=$(api_call POST "/projects" "{\"name\":\"${name}\"}")
+    local id
+    id=$(echo "$result" | jq -r '.id')
+
+    if [ -z "$id" ] || [ "$id" = "null" ]; then
+        log_error "Echec creation projet '${name}'"
+        exit 1
+    fi
+
+    log_ok "Projet '${name}' cree (id: ${id})"
+    echo "$id"
+}
+
+# Cherche une key par nom dans un projet
+find_key() {
+    local project_id="$1"
     local name="$2"
-    local create_data="$3"
-    local name_field="${4:-name}"
+    api_call GET "/project/${project_id}/keys" | jq -r ".[] | select(.name==\"${name}\") | .id // empty" 2>/dev/null || true
+}
+
+# Cree une key de type "none"
+create_key_none() {
+    local project_id="$1"
+    local name="$2"
 
     local existing
-    existing=$(api_get "/api/project/${PROJECT_ID}/${resource_type}" | jq -r ".[] | select(.${name_field} == \"${name}\") | .id" 2>/dev/null)
-
-    if [ -n "$existing" ] && [ "$existing" != "null" ]; then
-        info "${resource_type}/${name} existe deja (id=${existing})"
+    existing=$(find_key "$project_id" "$name")
+    if [ -n "$existing" ]; then
+        log_warn "  Key '${name}' existe deja (id: ${existing})"
         echo "$existing"
-    else
-        local result
-        result=$(api_post "/api/project/${PROJECT_ID}/${resource_type}" "$create_data") || fail "Creation ${resource_type}/${name}"
-        local new_id
-        new_id=$(echo "$result" | jq -r '.id')
-        ok "${resource_type}/${name} cree (id=${new_id})"
-        echo "$new_id"
+        return
     fi
+
+    local result
+    result=$(api_call POST "/project/${project_id}/keys" \
+        "{\"name\":\"${name}\",\"type\":\"none\",\"project_id\":${project_id}}")
+    local id
+    id=$(echo "$result" | jq -r '.id')
+    log_ok "  Key '${name}' creee (none, id: ${id})"
+    echo "$id"
 }
 
-# =============================================================================
-# MAIN
-# =============================================================================
+# Cree une key de type "login_password"
+create_key_login_password() {
+    local project_id="$1"
+    local name="$2"
+    local login="$3"
+    local password="$4"
 
-echo "=============================================="
-echo " Semaphore Setup - ${PROJECT_NAME}"
-echo "=============================================="
-echo ""
+    local existing
+    existing=$(find_key "$project_id" "$name")
+    if [ -n "$existing" ]; then
+        log_warn "  Key '${name}' existe deja (id: ${existing})"
+        echo "$existing"
+        return
+    fi
 
-# 1. Login
-api_login
+    local result
+    result=$(api_call POST "/project/${project_id}/keys" \
+        "{\"name\":\"${name}\",\"type\":\"login_password\",\"project_id\":${project_id},\"login_password\":{\"login\":\"${login}\",\"password\":\"${password}\"}}")
+    local id
+    id=$(echo "$result" | jq -r '.id')
+    log_ok "  Key '${name}' creee (login_password, id: ${id})"
+    echo "$id"
+}
 
-# 2. Creer le projet
-info "Creation du projet..."
-existing_project=$(api_get "/api/projects" | jq -r ".[] | select(.name == \"${PROJECT_NAME}\") | .id" 2>/dev/null)
+# Cree une key SSH
+create_key_ssh() {
+    local project_id="$1"
+    local name="$2"
+    local login="$3"
+    local private_key="$4"
 
-if [ -n "$existing_project" ] && [ "$existing_project" != "null" ]; then
-    PROJECT_ID="$existing_project"
-    info "Projet '${PROJECT_NAME}' existe deja (id=${PROJECT_ID})"
-else
-    result=$(api_post "/api/projects" "{\"name\": \"${PROJECT_NAME}\", \"alert\": false}") || fail "Creation projet"
-    PROJECT_ID=$(echo "$result" | jq -r '.id')
-    ok "Projet '${PROJECT_NAME}' cree (id=${PROJECT_ID})"
-fi
-echo ""
+    local existing
+    existing=$(find_key "$project_id" "$name")
+    if [ -n "$existing" ]; then
+        log_warn "  Key '${name}' existe deja (id: ${existing})"
+        echo "$existing"
+        return
+    fi
 
-# 3. Key Store
-info "Configuration du Key Store..."
+    # Echapper la cle privee pour JSON (remplacer newlines par \n)
+    local escaped_key
+    escaped_key=$(echo "$private_key" | jq -Rs '.')
 
-# 3a. Cle Git (acces depot)
-KEY_GIT_ID=$(find_or_create "keys" "git-toolbox" "{
-    \"name\": \"git-toolbox\",
-    \"type\": \"none\",
-    \"project_id\": ${PROJECT_ID}
-}")
+    local result
+    result=$(api_call POST "/project/${project_id}/keys" \
+        "{\"name\":\"${name}\",\"type\":\"ssh\",\"project_id\":${project_id},\"ssh\":{\"login\":\"${login}\",\"private_key\":${escaped_key}}}")
+    local id
+    id=$(echo "$result" | jq -r '.id')
+    log_ok "  Key '${name}' creee (ssh, id: ${id})"
+    echo "$id"
+}
 
-# 3b. Vault password
-KEY_VAULT_ID=$(find_or_create "keys" "vault-password" "{
-    \"name\": \"vault-password\",
-    \"type\": \"login_password\",
-    \"login_password\": {
-        \"login\": \"\",
-        \"password\": \"${VAULT_PASSWORD:-}\"
-    },
-    \"project_id\": ${PROJECT_ID}
-}")
+# Cherche un repository par nom dans un projet
+find_repository() {
+    local project_id="$1"
+    local name="$2"
+    api_call GET "/project/${project_id}/repositories" | jq -r ".[] | select(.name==\"${name}\") | .id // empty" 2>/dev/null || true
+}
 
-# 3c. Cle SSH serveurs distants
-KEY_SSH_ID=$(find_or_create "keys" "ssh-servers" "{
-    \"name\": \"ssh-servers\",
-    \"type\": \"ssh\",
-    \"ssh\": {
-        \"login\": \"${SSH_USER:-ubuntu}\",
-        \"private_key\": \"${SSH_PRIVATE_KEY:-}\"
-    },
-    \"project_id\": ${PROJECT_ID}
-}")
+# Cree un repository
+create_repository() {
+    local project_id="$1"
+    local name="$2"
+    local git_url="$3"
+    local branch="$4"
+    local key_id="$5"
 
-# 3d. Credentials Cisco (login/password)
-KEY_CISCO_ID=$(find_or_create "keys" "cisco-credentials" "{
-    \"name\": \"cisco-credentials\",
-    \"type\": \"login_password\",
-    \"login_password\": {
-        \"login\": \"${CISCO_USER:-admin}\",
-        \"password\": \"${CISCO_PASSWORD:-}\"
-    },
-    \"project_id\": ${PROJECT_ID}
-}")
-echo ""
+    local existing
+    existing=$(find_repository "$project_id" "$name")
+    if [ -n "$existing" ]; then
+        log_warn "  Repository '${name}' existe deja (id: ${existing})"
+        echo "$existing"
+        return
+    fi
 
-# 4. Repository
-info "Configuration du repository..."
-REPO_ID=$(find_or_create "repositories" "ansible-toolbox" "{
-    \"name\": \"ansible-toolbox\",
-    \"project_id\": ${PROJECT_ID},
-    \"git_url\": \"${GIT_REPO_URL}\",
-    \"git_branch\": \"${GIT_BRANCH}\",
-    \"ssh_key_id\": ${KEY_GIT_ID}
-}")
-echo ""
+    local result
+    result=$(api_call POST "/project/${project_id}/repositories" \
+        "{\"name\":\"${name}\",\"project_id\":${project_id},\"git_url\":\"${git_url}\",\"git_branch\":\"${branch}\",\"ssh_key_id\":${key_id}}")
+    local id
+    id=$(echo "$result" | jq -r '.id')
+    log_ok "  Repository '${name}' cree (id: ${id})"
+    echo "$id"
+}
 
-# 5. Inventaires
-info "Configuration des inventaires..."
+# Cherche un inventaire par nom dans un projet
+find_inventory() {
+    local project_id="$1"
+    local name="$2"
+    api_call GET "/project/${project_id}/inventory" | jq -r ".[] | select(.name==\"${name}\") | .id // empty" 2>/dev/null || true
+}
 
-# 5a. Inventaire fichier (remote + zabbix_agents)
-INV_FILE_ID=$(find_or_create "inventory" "hosts-file" "{
-    \"name\": \"hosts-file\",
-    \"project_id\": ${PROJECT_ID},
-    \"type\": \"file\",
-    \"inventory\": \"inventory/hosts.yml\",
-    \"ssh_key_id\": ${KEY_SSH_ID},
-    \"become_key_id\": ${KEY_SSH_ID}
-}")
+# Cree un inventaire de type "file"
+create_inventory() {
+    local project_id="$1"
+    local name="$2"
+    local file_path="$3"
+    local ssh_key_id="$4"
+    local become_key_id="$5"
+    local repo_id="$6"
 
-# 5b. Inventaire pour equipements reseau (Cisco)
-INV_NETWORK_ID=$(find_or_create "inventory" "network-devices" "{
-    \"name\": \"network-devices\",
-    \"project_id\": ${PROJECT_ID},
-    \"type\": \"file\",
-    \"inventory\": \"inventory/hosts.yml\",
-    \"ssh_key_id\": ${KEY_CISCO_ID},
-    \"become_key_id\": ${KEY_CISCO_ID}
-}")
-echo ""
+    local existing
+    existing=$(find_inventory "$project_id" "$name")
+    if [ -n "$existing" ]; then
+        log_warn "  Inventaire '${name}' existe deja (id: ${existing})"
+        echo "$existing"
+        return
+    fi
 
-# 6. Environments
-info "Configuration des environnements..."
+    local result
+    result=$(api_call POST "/project/${project_id}/inventory" \
+        "{\"name\":\"${name}\",\"project_id\":${project_id},\"inventory\":\"${file_path}\",\"type\":\"file\",\"ssh_key_id\":${ssh_key_id},\"become_key_id\":${become_key_id},\"repository_id\":${repo_id}}")
+    local id
+    id=$(echo "$result" | jq -r '.id')
+    log_ok "  Inventaire '${name}' cree (id: ${id})"
+    echo "$id"
+}
 
-ENV_DEFAULT_ID=$(find_or_create "environment" "default" "{
-    \"name\": \"default\",
-    \"project_id\": ${PROJECT_ID},
-    \"json\": \"{}\",
-    \"env\": \"{}\"
-}")
-echo ""
+# Cherche un environnement par nom dans un projet
+find_environment() {
+    local project_id="$1"
+    local name="$2"
+    api_call GET "/project/${project_id}/environment" | jq -r ".[] | select(.name==\"${name}\") | .id // empty" 2>/dev/null || true
+}
 
-# 7. Task Templates
-info "Creation des Task Templates..."
+# Cree un environnement
+create_environment() {
+    local project_id="$1"
+    local name="$2"
 
+    local existing
+    existing=$(find_environment "$project_id" "$name")
+    if [ -n "$existing" ]; then
+        log_warn "  Environnement '${name}' existe deja (id: ${existing})"
+        echo "$existing"
+        return
+    fi
+
+    local result
+    result=$(api_call POST "/project/${project_id}/environment" \
+        "{\"name\":\"${name}\",\"project_id\":${project_id},\"json\":\"{}\",\"env\":\"{}\"}")
+    local id
+    id=$(echo "$result" | jq -r '.id')
+    log_ok "  Environnement '${name}' cree (id: ${id})"
+    echo "$id"
+}
+
+# Cherche un template par nom dans un projet
+find_template() {
+    local project_id="$1"
+    local name="$2"
+    api_call GET "/project/${project_id}/templates" | jq -r ".[] | select(.name==\"${name}\") | .id // empty" 2>/dev/null || true
+}
+
+# Cree un template
+# Arguments: project_id name playbook inventory_id repo_id env_id [arguments] [survey_json] [vault_key_id] [description]
 create_template() {
-    local name="$1"
-    local playbook="$2"
-    local inventory_id="$3"
-    local vault_key="${4:-0}"
-    local extra_args="${5:-}"
-    local survey_json="${6:-[]}"
+    local project_id="$1"
+    local name="$2"
+    local playbook="$3"
+    local inventory_id="$4"
+    local repo_id="$5"
+    local env_id="$6"
+    local arguments="${7:-}"
+    local survey_json="${8:-}"
+    local vault_key_id="${9:-}"
+    local description="${10:-}"
 
-    local vault_block=""
-    if [ "$vault_key" -gt 0 ]; then
-        vault_block="\"vault_key_id\": ${vault_key},"
+    local existing
+    existing=$(find_template "$project_id" "$name")
+    if [ -n "$existing" ]; then
+        log_warn "  Template '${name}' existe deja (id: ${existing})"
+        return
     fi
 
-    local args_block=""
-    if [ -n "$extra_args" ]; then
-        args_block="\"arguments\": \"${extra_args}\","
+    # Construire le JSON
+    local json
+    json=$(jq -n \
+        --arg name "$name" \
+        --arg playbook "$playbook" \
+        --arg description "$description" \
+        --argjson project_id "$project_id" \
+        --argjson inventory_id "$inventory_id" \
+        --argjson repo_id "$repo_id" \
+        --argjson env_id "$env_id" \
+        '{
+            project_id: $project_id,
+            inventory_id: $inventory_id,
+            repository_id: $repo_id,
+            environment_id: $env_id,
+            name: $name,
+            playbook: $playbook,
+            description: $description,
+            app: "ansible",
+            allow_override_args_in_task: true
+        }')
+
+    # Ajouter arguments si present
+    if [ -n "$arguments" ]; then
+        json=$(echo "$json" | jq --arg args "$arguments" '. + {arguments: $args}')
     fi
 
-    find_or_create "templates" "$name" "{
-        \"name\": \"${name}\",
-        \"project_id\": ${PROJECT_ID},
-        \"repository_id\": ${REPO_ID},
-        \"inventory_id\": ${inventory_id},
-        \"environment_id\": ${ENV_DEFAULT_ID},
-        ${vault_block}
-        ${args_block}
-        \"playbook\": \"${playbook}\",
-        \"type\": \"\",
-        \"survey_vars\": ${survey_json}
-    }" > /dev/null
+    # Ajouter survey_vars si present
+    if [ -n "$survey_json" ]; then
+        json=$(echo "$json" | jq --argjson sv "$survey_json" '. + {survey_vars: $sv}')
+    fi
+
+    # Ajouter vaults si vault_key_id present
+    if [ -n "$vault_key_id" ]; then
+        json=$(echo "$json" | jq --argjson vkid "$vault_key_id" '. + {vaults: [{vault_key_id: $vkid, name: "default", type: "password"}]}')
+    fi
+
+    api_call POST "/project/${project_id}/templates" "$json" >/dev/null
+    log_ok "  Template '${name}' cree"
 }
 
-# --- Bootstrap & Check (hosts: remote) ---
-create_template \
-    "Bootstrap - Server" \
-    "playbooks/bootstrap.yml" \
-    "$INV_FILE_ID" \
-    "$KEY_VAULT_ID"
+# ==============================================================================
+# Configuration des projets
+# ==============================================================================
 
-create_template \
-    "Check - Server state" \
-    "playbooks/check.yml" \
-    "$INV_FILE_ID" \
-    0
+# --- Projet Infrastructure ---------------------------------------------------
+setup_project_infra() {
+    local project_name="$PROJECT_INFRA"
+    log_section "Projet : ${project_name}"
 
-create_template \
-    "Bootstrap - Dry Run" \
-    "playbooks/bootstrap.yml" \
-    "$INV_FILE_ID" \
-    "$KEY_VAULT_ID" \
-    "[\\\"--check\\\", \\\"--diff\\\"]"
+    local project_id
+    project_id=$(create_project "$project_name")
 
-# --- Zabbix Agent (hosts: zabbix_agents) ---
-create_template \
-    "Deploy - Zabbix Agent 2" \
-    "playbooks/deploy-zabbix-agent.yml" \
-    "$INV_FILE_ID" \
-    0
+    # Keys
+    log_info "Configuration des keys..."
+    local key_git key_ssh key_vault
+    key_git=$(create_key_none "$project_id" "git-toolbox")
 
-create_template \
-    "Deploy - Zabbix Agent 2 (Dry Run)" \
-    "playbooks/deploy-zabbix-agent.yml" \
-    "$INV_FILE_ID" \
-    0 \
-    "[\\\"--check\\\", \\\"--diff\\\"]"
+    if [ -n "${SSH_PRIVATE_KEY:-}" ]; then
+        key_ssh=$(create_key_ssh "$project_id" "ssh-servers" "${SSH_USER:-ubuntu}" "$SSH_PRIVATE_KEY")
+    else
+        key_ssh=$(create_key_none "$project_id" "ssh-servers")
+        log_warn "  SSH_PRIVATE_KEY non defini, key creee sans cle (a configurer dans l'UI)"
+    fi
 
-# --- Cisco Backup (hosts: network) ---
-create_template \
-    "Backup - Cisco configs" \
-    "playbooks/backup-cisco.yml" \
-    "$INV_NETWORK_ID" \
-    0
+    if [ -n "${VAULT_PASSWORD:-}" ]; then
+        key_vault=$(create_key_login_password "$project_id" "vault-password" "" "$VAULT_PASSWORD")
+    else
+        key_vault=$(create_key_login_password "$project_id" "vault-password" "" "changeme")
+        log_warn "  VAULT_PASSWORD non defini dans .env, utiliser 'changeme' par defaut"
+    fi
 
-create_template \
-    "Backup - Cisco configs (no push)" \
-    "playbooks/backup-cisco.yml" \
-    "$INV_NETWORK_ID" \
-    0 \
-    "[\\\"--extra-vars\\\", \\\"cisco_backup_git_push=false\\\"]"
+    # Repository
+    log_info "Configuration du repository..."
+    local repo_id
+    repo_id=$(create_repository "$project_id" "ansible-toolbox" "$GIT_URL" "$GIT_BRANCH" "$key_git")
 
-# --- Portal (hosts: portal_servers) ---
-create_template \
-    "Portal - Deploy Stack Complete" \
-    "playbooks/portal-site.yml" \
-    "$INV_FILE_ID" \
-    "$KEY_VAULT_ID"
+    # Inventaire
+    log_info "Configuration de l'inventaire..."
+    local inv_id
+    inv_id=$(create_inventory "$project_id" "all-servers" "$INVENTORY_PATH" "$key_ssh" "$key_ssh" "$repo_id")
 
-create_template \
-    "Portal - Dry Run" \
-    "playbooks/portal-site.yml" \
-    "$INV_FILE_ID" \
-    "$KEY_VAULT_ID" \
-    "[\\\"--check\\\", \\\"--diff\\\"]"
+    # Environnement
+    log_info "Configuration de l'environnement..."
+    local env_id
+    env_id=$(create_environment "$project_id" "production")
 
-SURVEY_SERVICE='[{"name":"service","title":"Service name","required":true,"type":"","enum":["keycloak","oauth2-proxy","guacamole","credentials-api","portal-api","vaultwarden","headscale","linshare","bookstack"]}]'
-create_template \
-    "Portal - Deploy Service" \
-    "playbooks/portal-deploy-service.yml" \
-    "$INV_FILE_ID" \
-    "$KEY_VAULT_ID" \
-    "" \
-    "$SURVEY_SERVICE"
+    # Templates
+    log_info "Creation des templates..."
 
-SURVEY_DESTROY='[{"name":"service","title":"Service to destroy","required":true,"type":"","enum":["all","keycloak","oauth2-proxy","guacamole","credentials-api","portal-api","vaultwarden","headscale","linshare","bookstack"]},{"name":"confirm","title":"Confirm destruction","required":true,"type":"","enum":["true","false"]}]'
-create_template \
-    "Portal - Destroy Service" \
-    "playbooks/portal-destroy.yml" \
-    "$INV_FILE_ID" \
-    "$KEY_VAULT_ID" \
-    "" \
-    "$SURVEY_DESTROY"
+    create_template "$project_id" \
+        "Bootstrap - Server" \
+        "${PLAYBOOK_DIR}/bootstrap.yml" \
+        "$inv_id" "$repo_id" "$env_id" \
+        "" "" "$key_vault" \
+        "Preparation initiale d'un serveur (packages, users, Docker)"
 
-echo ""
-echo "=============================================="
-echo " Setup termine"
-echo "=============================================="
-echo ""
-echo "Projet     : ${PROJECT_NAME} (id=${PROJECT_ID})"
-echo "URL        : ${SEMAPHORE_URL}/project/${PROJECT_ID}/templates"
-echo ""
-echo "Templates crees :"
-echo "  - Bootstrap - Server"
-echo "  - Bootstrap - Dry Run"
-echo "  - Check - Server state"
-echo "  - Deploy - Zabbix Agent 2"
-echo "  - Deploy - Zabbix Agent 2 (Dry Run)"
-echo "  - Backup - Cisco configs"
-echo "  - Backup - Cisco configs (no push)"
-echo "  - Portal - Deploy Stack Complete"
-echo "  - Portal - Dry Run"
-echo "  - Portal - Deploy Service"
-echo "  - Portal - Destroy Service"
-echo ""
-echo "Prochaines etapes :"
-echo "  1. Verifier les credentials dans Key Store (SSH key, Cisco, vault)"
-echo "  2. Configurer les hosts dans inventory/hosts.yml"
-echo "  3. Lancer un template de test"
+    create_template "$project_id" \
+        "Bootstrap - Dry Run" \
+        "${PLAYBOOK_DIR}/bootstrap.yml" \
+        "$inv_id" "$repo_id" "$env_id" \
+        "[\"--check\", \"--diff\"]" "" "$key_vault" \
+        "Verification sans modification du bootstrap"
 
-# Cleanup
-rm -f /tmp/semaphore-cookies
+    create_template "$project_id" \
+        "Check - Server state" \
+        "${PLAYBOOK_DIR}/check.yml" \
+        "$inv_id" "$repo_id" "$env_id" \
+        "" "" "" \
+        "Verification de l'etat des serveurs (connectivity, services)"
+
+    log_ok "Projet '${project_name}' configure (${project_id})"
+}
+
+# --- Projet Portail Securise --------------------------------------------------
+setup_project_portal() {
+    local project_name="$PROJECT_PORTAL"
+    log_section "Projet : ${project_name}"
+
+    local project_id
+    project_id=$(create_project "$project_name")
+
+    # Keys
+    log_info "Configuration des keys..."
+    local key_git key_ssh key_vault
+    key_git=$(create_key_none "$project_id" "git-toolbox")
+
+    if [ -n "${SSH_PRIVATE_KEY:-}" ]; then
+        key_ssh=$(create_key_ssh "$project_id" "ssh-servers" "${SSH_USER:-ubuntu}" "$SSH_PRIVATE_KEY")
+    else
+        key_ssh=$(create_key_none "$project_id" "ssh-servers")
+        log_warn "  SSH_PRIVATE_KEY non defini, key creee sans cle (a configurer dans l'UI)"
+    fi
+
+    if [ -n "${VAULT_PASSWORD:-}" ]; then
+        key_vault=$(create_key_login_password "$project_id" "vault-password" "" "$VAULT_PASSWORD")
+    else
+        key_vault=$(create_key_login_password "$project_id" "vault-password" "" "changeme")
+        log_warn "  VAULT_PASSWORD non defini dans .env, utiliser 'changeme' par defaut"
+    fi
+
+    # Repository
+    log_info "Configuration du repository..."
+    local repo_id
+    repo_id=$(create_repository "$project_id" "ansible-toolbox" "$GIT_URL" "$GIT_BRANCH" "$key_git")
+
+    # Inventaire
+    log_info "Configuration de l'inventaire..."
+    local inv_id
+    inv_id=$(create_inventory "$project_id" "portal-servers" "$INVENTORY_PATH" "$key_ssh" "$key_ssh" "$repo_id")
+
+    # Environnement
+    log_info "Configuration de l'environnement..."
+    local env_id
+    env_id=$(create_environment "$project_id" "production")
+
+    # Templates
+    log_info "Creation des templates..."
+
+    # Survey pour le choix du service
+    local survey_service='[{"name":"service","title":"Service","description":"Nom du service a deployer","type":"","required":true,"enum":["keycloak","oauth2-proxy","guacamole","credentials-api","portal-api","vaultwarden","headscale","linshare","bookstack"]}]'
+    local survey_destroy='[{"name":"service","title":"Service","description":"Nom du service a detruire","type":"","required":true,"enum":["all","keycloak","oauth2-proxy","guacamole","credentials-api","portal-api","vaultwarden","headscale","linshare","bookstack"]},{"name":"confirm","title":"Confirmation","description":"Taper true pour confirmer la destruction","type":"","required":true,"enum":["true","false"]}]'
+
+    create_template "$project_id" \
+        "Portal - Deploy Stack Complete" \
+        "${PLAYBOOK_DIR}/portal-site.yml" \
+        "$inv_id" "$repo_id" "$env_id" \
+        "" "" "$key_vault" \
+        "Deploiement complet de la stack portail securise"
+
+    create_template "$project_id" \
+        "Portal - Dry Run" \
+        "${PLAYBOOK_DIR}/portal-site.yml" \
+        "$inv_id" "$repo_id" "$env_id" \
+        "[\"--check\", \"--diff\"]" "" "$key_vault" \
+        "Verification sans modification (dry run) de la stack complete"
+
+    create_template "$project_id" \
+        "Portal - Deploy Service" \
+        "${PLAYBOOK_DIR}/portal-deploy-service.yml" \
+        "$inv_id" "$repo_id" "$env_id" \
+        "" "$survey_service" "$key_vault" \
+        "Deploiement d'un service individuel (keycloak, oauth2-proxy, guacamole, etc.)"
+
+    create_template "$project_id" \
+        "Portal - Destroy Service" \
+        "${PLAYBOOK_DIR}/portal-destroy.yml" \
+        "$inv_id" "$repo_id" "$env_id" \
+        "" "$survey_destroy" "$key_vault" \
+        "Destruction d'un service (necessite confirmation)"
+
+    log_ok "Projet '${project_name}' configure (${project_id})"
+}
+
+# --- Projet Monitoring --------------------------------------------------------
+setup_project_monitoring() {
+    local project_name="$PROJECT_MONITORING"
+    log_section "Projet : ${project_name}"
+
+    local project_id
+    project_id=$(create_project "$project_name")
+
+    # Keys
+    log_info "Configuration des keys..."
+    local key_git key_ssh
+    key_git=$(create_key_none "$project_id" "git-toolbox")
+
+    if [ -n "${SSH_PRIVATE_KEY:-}" ]; then
+        key_ssh=$(create_key_ssh "$project_id" "ssh-servers" "${SSH_USER:-ubuntu}" "$SSH_PRIVATE_KEY")
+    else
+        key_ssh=$(create_key_none "$project_id" "ssh-servers")
+        log_warn "  SSH_PRIVATE_KEY non defini, key creee sans cle (a configurer dans l'UI)"
+    fi
+
+    # Repository
+    log_info "Configuration du repository..."
+    local repo_id
+    repo_id=$(create_repository "$project_id" "ansible-toolbox" "$GIT_URL" "$GIT_BRANCH" "$key_git")
+
+    # Inventaire
+    log_info "Configuration de l'inventaire..."
+    local inv_id
+    inv_id=$(create_inventory "$project_id" "zabbix-agents" "$INVENTORY_PATH" "$key_ssh" "$key_ssh" "$repo_id")
+
+    # Environnement
+    log_info "Configuration de l'environnement..."
+    local env_id
+    env_id=$(create_environment "$project_id" "production")
+
+    # Templates
+    log_info "Creation des templates..."
+
+    create_template "$project_id" \
+        "Deploy - Zabbix Agent 2" \
+        "${PLAYBOOK_DIR}/deploy-zabbix-agent.yml" \
+        "$inv_id" "$repo_id" "$env_id" \
+        "" "" "" \
+        "Installation et configuration de Zabbix Agent 2"
+
+    create_template "$project_id" \
+        "Deploy - Zabbix Agent 2 (Dry Run)" \
+        "${PLAYBOOK_DIR}/deploy-zabbix-agent.yml" \
+        "$inv_id" "$repo_id" "$env_id" \
+        "[\"--check\", \"--diff\"]" "" "" \
+        "Verification sans modification du deploiement Zabbix Agent 2"
+
+    log_ok "Projet '${project_name}' configure (${project_id})"
+}
+
+# --- Projet Network Backup ---------------------------------------------------
+setup_project_network() {
+    local project_name="$PROJECT_NETWORK"
+    log_section "Projet : ${project_name}"
+
+    local project_id
+    project_id=$(create_project "$project_name")
+
+    # Keys
+    log_info "Configuration des keys..."
+    local key_git key_cisco
+    key_git=$(create_key_none "$project_id" "git-toolbox")
+
+    if [ -n "${CISCO_USER:-}" ] && [ -n "${CISCO_PASSWORD:-}" ]; then
+        key_cisco=$(create_key_login_password "$project_id" "cisco-credentials" "$CISCO_USER" "$CISCO_PASSWORD")
+    else
+        key_cisco=$(create_key_login_password "$project_id" "cisco-credentials" "admin" "changeme")
+        log_warn "  CISCO_USER/CISCO_PASSWORD non definis, utiliser des valeurs par defaut"
+    fi
+
+    # Repository
+    log_info "Configuration du repository..."
+    local repo_id
+    repo_id=$(create_repository "$project_id" "ansible-toolbox" "$GIT_URL" "$GIT_BRANCH" "$key_git")
+
+    # Inventaire
+    log_info "Configuration de l'inventaire..."
+    local inv_id
+    inv_id=$(create_inventory "$project_id" "network-devices" "$INVENTORY_PATH" "$key_cisco" "$key_cisco" "$repo_id")
+
+    # Environnement
+    log_info "Configuration de l'environnement..."
+    local env_id
+    env_id=$(create_environment "$project_id" "production")
+
+    # Templates
+    log_info "Creation des templates..."
+
+    create_template "$project_id" \
+        "Backup - Network configs" \
+        "${PLAYBOOK_DIR}/backup-cisco.yml" \
+        "$inv_id" "$repo_id" "$env_id" \
+        "" "" "" \
+        "Sauvegarde des configurations reseau (Cisco) avec push Git"
+
+    create_template "$project_id" \
+        "Backup - Network configs (no push)" \
+        "${PLAYBOOK_DIR}/backup-cisco.yml" \
+        "$inv_id" "$repo_id" "$env_id" \
+        "[\"-e\", \"cisco_backup_git_push=false\"]" "" "" \
+        "Sauvegarde des configurations reseau sans push Git"
+
+    log_ok "Projet '${project_name}' configure (${project_id})"
+}
+
+# ==============================================================================
+# Resume
+# ==============================================================================
+
+print_summary() {
+    log_section "Resume"
+
+    echo -e "\nProjets crees :"
+    echo -e "  ${GREEN}1.${NC} ${PROJECT_INFRA}"
+    echo -e "     Templates : Bootstrap - Server, Bootstrap - Dry Run, Check - Server state"
+    echo -e "     Keys      : git-toolbox, ssh-servers, vault-password"
+    echo ""
+    echo -e "  ${GREEN}2.${NC} ${PROJECT_PORTAL}"
+    echo -e "     Templates : Portal - Deploy Stack Complete, Portal - Dry Run,"
+    echo -e "                 Portal - Deploy Service, Portal - Destroy Service"
+    echo -e "     Keys      : git-toolbox, ssh-servers, vault-password"
+    echo ""
+    echo -e "  ${GREEN}3.${NC} ${PROJECT_MONITORING}"
+    echo -e "     Templates : Deploy - Zabbix Agent 2, Deploy - Zabbix Agent 2 (Dry Run)"
+    echo -e "     Keys      : git-toolbox, ssh-servers"
+    echo ""
+    echo -e "  ${GREEN}4.${NC} ${PROJECT_NETWORK}"
+    echo -e "     Templates : Backup - Network configs, Backup - Network configs (no push)"
+    echo -e "     Keys      : git-toolbox, cisco-credentials"
+    echo ""
+
+    echo -e "Acces Semaphore : ${BLUE}${SEMAPHORE_URL}${NC}"
+    echo -e "Utilisateur     : ${SEMAPHORE_ADMIN_USER}"
+    echo ""
+    echo -e "${YELLOW}Prochaines etapes :${NC}"
+    echo "  1. Verifier les credentials dans Key Store (SSH key, vault password)"
+    echo "  2. Configurer les hosts dans inventory/hosts.yml"
+    echo "  3. Lancer un template de test"
+}
+
+# ==============================================================================
+# Main
+# ==============================================================================
+
+main() {
+    echo -e "${BLUE}=============================================${NC}"
+    echo -e "${BLUE}  Semaphore - Configuration multi-projets${NC}"
+    echo -e "${BLUE}=============================================${NC}"
+    echo ""
+
+    # Verifier les prerequis
+    if ! command -v jq &>/dev/null; then
+        log_error "jq est requis. Installer avec : apt install jq"
+        exit 1
+    fi
+
+    if ! command -v curl &>/dev/null; then
+        log_error "curl est requis."
+        exit 1
+    fi
+
+    # Verifier que Semaphore est accessible
+    if ! curl -sf "${SEMAPHORE_URL}/api/ping" >/dev/null 2>&1; then
+        log_error "Semaphore n'est pas accessible sur ${SEMAPHORE_URL}"
+        log_error "Demarrer avec : cd semaphore && docker compose up -d"
+        exit 1
+    fi
+
+    # Authentification
+    authenticate
+
+    # Creer les 4 projets
+    setup_project_infra
+    setup_project_portal
+    setup_project_monitoring
+    setup_project_network
+
+    # Resume
+    print_summary
+
+    log_ok "Configuration terminee."
+}
+
+main "$@"
