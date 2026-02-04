@@ -1,0 +1,115 @@
+---
+# =============================================================================
+# Role common - Valeurs par defaut
+# =============================================================================
+# Surchargeables via group_vars/all/vars.yml ou --extra-vars
+
+# Repertoire racine des donnees persistantes
+data_dir: /data
+
+# Repertoire du projet (environments/prod/)
+prod_dir: "{{ playbook_dir }}/../environments/prod"
+
+# Fichier .env (pour secrets et lineinfile)
+env_file: "{{ prod_dir }}/.env"
+
+# Domaine principal
+domain: example.com
+
+# Timezone
+tz: Europe/Paris
+
+# Certificats SSL
+tls_cert_file: "{{ data_dir }}/certs/wildcard.{{ domain }}.crt"
+tls_key_file: "{{ data_dir }}/certs/wildcard.{{ domain }}.key"
+
+# Keycloak OIDC (source unique)
+keycloak_issuer: ""
+
+# Repertoires a creer sous data_dir
+data_directories:
+  - certs
+  - certs/custom-ca
+  - guacamole/postgres
+  - guacamole/drive
+  - guacamole/record
+  - guacamole/extensions
+  - logs/nginx
+  - logs/guacamole
+  - portal
+
+# Repertoires locaux (relatifs a prod_dir)
+local_directories:
+  - oauth2-proxy/nginx
+
+# Reseaux Docker a creer
+docker_networks:
+  - auth-net
+  - portal-net
+  - guacamole-net
+  - prod_apps-net
+  - linshare_linshare-net
+  - keycloak-net
+  - headscale-net
+
+# Secrets auto-generes (nom_variable, type, condition)
+# Types: base64 (python3 urlsafe 32 bytes), base64-48 (openssl), hex-16 (openssl)
+auto_secrets:
+  - name: COOKIE_SECRET
+    var: vault_cookie_secret
+    type: base64
+    condition: true
+
+  - name: GUACAMOLE_DB_PASSWORD
+    var: vault_guacamole_db_password
+    type: base64
+    condition: true
+
+  - name: GUACAMOLE_ADMIN_PASSWORD
+    var: vault_guacamole_admin_password
+    type: base64
+    condition: "{{ deploy_guacamole | bool }}"
+
+  - name: LINSHARE_DB_PASSWORD
+    var: vault_linshare_db_password
+    type: base64
+    condition: "{{ deploy_linshare | bool }}"
+
+  - name: LINSHARE_MONGO_PASSWORD
+    var: vault_linshare_mongo_password
+    type: base64
+    condition: "{{ deploy_linshare | bool }}"
+
+  - name: VAULTWARDEN_ADMIN_TOKEN
+    var: vault_vaultwarden_admin_token
+    type: base64-48
+    condition: "{{ deploy_vaultwarden | bool }}"
+
+  - name: HEADPLANE_COOKIE_SECRET
+    var: vault_headplane_cookie_secret
+    type: hex-16
+    condition: "{{ deploy_headscale | bool }}"
+
+  - name: CREDENTIALS_ENCRYPTION_KEY
+    var: vault_credentials_encryption_key
+    type: base64
+    condition: "{{ deploy_credentials_api | bool }}"
+
+  - name: KEYCLOAK_ADMIN_PASSWORD
+    var: vault_keycloak_admin_password
+    type: base64
+    condition: true
+
+  - name: KEYCLOAK_DB_PASSWORD
+    var: vault_keycloak_db_password
+    type: base64
+    condition: true
+
+# Flags de deploiement (defauts securitaires)
+deploy_oauth2_proxy: true
+deploy_guacamole: true
+deploy_credentials_api: true
+deploy_linshare: false
+deploy_headscale: false
+deploy_bookstack: false
+deploy_vaultwarden: false

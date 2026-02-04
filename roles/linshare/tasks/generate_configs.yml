@@ -1,0 +1,62 @@
+---
+# =============================================================================
+# LinShare - Generate Configuration Files from Templates
+# =============================================================================
+
+- name: Ensure LinShare config directory exists
+  ansible.builtin.file:
+    path: "{{ linshare_config_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Generate linshare.properties from template
+  ansible.builtin.template:
+    src: linshare.properties.j2
+    dest: "{{ linshare_config_dir }}/linshare.properties"
+    owner: root
+    group: root
+    mode: '0600'
+  notify: restart linshare backend
+  no_log: true
+
+- name: Check if linshare-extra.properties exists in source
+  ansible.builtin.stat:
+    path: "{{ linshare_templates_dir }}/linshare-extra.properties"
+  register: linshare_extra_stat
+
+- name: Copy linshare-extra.properties
+  ansible.builtin.copy:
+    src: "{{ linshare_templates_dir }}/linshare-extra.properties"
+    dest: "{{ linshare_config_dir }}/linshare-extra.properties"
+    owner: root
+    group: root
+    mode: '0600'
+  when: linshare_extra_stat.stat.exists
+  notify: restart linshare backend
+
+- name: Generate config.js (UI user) from template
+  ansible.builtin.template:
+    src: config.js.j2
+    dest: "{{ linshare_config_dir }}/config.js"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart linshare ui user
+
+- name: Check if config-admin.js template exists
+  ansible.builtin.stat:
+    path: "{{ role_path }}/templates/config-admin.js.j2"
+  register: config_admin_template_stat
+  delegate_to: localhost
+
+- name: Generate config-admin.js (UI admin) from template
+  ansible.builtin.template:
+    src: config-admin.js.j2
+    dest: "{{ linshare_config_dir }}/config-admin.js"
+    owner: root
+    group: root
+    mode: '0644'
+  when: config_admin_template_stat.stat.exists
+  notify: restart linshare ui admin

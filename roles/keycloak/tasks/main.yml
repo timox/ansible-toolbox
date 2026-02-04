@@ -1,0 +1,46 @@
+---
+# =============================================================================
+# Role keycloak - Task router
+# =============================================================================
+# Point d'entree principal du role Keycloak
+
+- name: Validate keycloak_state variable
+  ansible.builtin.assert:
+    that:
+      - keycloak_state in ['present', 'absent']
+    fail_msg: "keycloak_state must be 'present' or 'absent'"
+  tags:
+    - keycloak
+    - keycloak-validate
+
+- name: Validate Keycloak OIDC issuer is configured
+  ansible.builtin.assert:
+    that:
+      - keycloak_issuer is defined
+      - keycloak_issuer | length > 0
+    fail_msg: "keycloak_issuer must be defined (e.g., https://keycloak.example.com/realms/portal)"
+  when: keycloak_state == 'present'
+  tags:
+    - keycloak
+    - keycloak-validate
+
+- name: Deploy Keycloak service
+  ansible.builtin.include_tasks: deploy.yml
+  when: keycloak_state == 'present'
+  tags:
+    - keycloak
+    - keycloak-deploy
+
+- name: Wait for Keycloak readiness
+  ansible.builtin.include_tasks: wait_ready.yml
+  when: keycloak_state == 'present'
+  tags:
+    - keycloak
+    - keycloak-readiness
+
+- name: Remove Keycloak service
+  ansible.builtin.include_tasks: remove.yml
+  when: keycloak_state == 'absent'
+  tags:
+    - keycloak
+    - keycloak-remove

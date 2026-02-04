@@ -1,0 +1,32 @@
+---
+# =============================================================================
+# DOCKER_APP - Validation
+# =============================================================================
+# Validates that all required variables are set and have valid values.
+
+- name: Validate state variable for {{ docker_app_name }}
+  ansible.builtin.assert:
+    that:
+      - docker_app_state in ['present', 'absent']
+    fail_msg: "docker_app_state must be 'present' or 'absent', got '{{ docker_app_state }}'"
+
+- name: Validate required variables for {{ docker_app_name }}
+  ansible.builtin.assert:
+    that:
+      - docker_app_name | length > 0
+      - docker_app_compose_dir | length > 0
+    fail_msg: "docker_app_name and docker_app_compose_dir are required"
+
+- name: Validate compose directory exists for {{ docker_app_name }}
+  ansible.builtin.stat:
+    path: "{{ docker_app_compose_dir }}"
+  register: _docker_app_compose_dir_stat
+  when: docker_app_state == 'present'
+
+- name: Fail if compose directory missing for {{ docker_app_name }}
+  ansible.builtin.fail:
+    msg: "Compose directory {{ docker_app_compose_dir }} does not exist"
+  when:
+    - docker_app_state == 'present'
+    - not (_docker_app_compose_dir_stat.stat.exists | default(false))
+    - not ansible_check_mode

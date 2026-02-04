@@ -1,0 +1,97 @@
+# oauth2-proxy Configuration Template
+# Remplacer les variables ${VAR} avec envsubst
+
+## Provider OIDC (Keycloak)
+provider = "oidc"
+provider_display_name = "Keycloak SSO"
+oidc_issuer_url = "${KEYCLOAK_ISSUER}"
+client_id = "${OIDC_CLIENT_ID}"
+client_secret = "${OIDC_CLIENT_SECRET}"
+redirect_url = "${OAUTH2_PROXY_REDIRECT_URL}"
+
+## Scopes OIDC
+# groups: scope custom créé dans Keycloak (voir keycloak/setup-clients.sh)
+scope = "openid email profile groups"
+oidc_groups_claim = "groups"
+
+## Claims additionnels à extraire du token (roles Keycloak)
+# Les roles sont dans realm_access.roles et resource_access.{client}.roles
+# On peut aussi créer un mapper custom "allowed_apps" dans Keycloak
+
+## Email verification (désactivé pour utilisateurs AD/LDAP synchronisés)
+# Les emails AD sont considérés comme fiables même si non marqués "verified" dans Keycloak
+insecure_oidc_allow_unverified_email = true
+
+## Skip TLS verification for OIDC provider (certificat auto-signé)
+ssl_insecure_skip_verify = true
+
+## Adresse d'ecoute HTTP
+http_address = ":4180"
+
+## SSL/TLS (optionnel - decommenter pour HTTPS)
+# https_address = ":44180"
+# tls_cert_file = "/certs/wildcard.example.com.crt"
+# tls_key_file = "/certs/wildcard.example.com.key"
+
+## Upstreams
+# oauth2-proxy proxifie vers nginx sur port 80 après authentification
+upstreams = ["http://nginx-apps:80"]
+
+## Cookies
+cookie_name = "_oauth2_proxy"
+cookie_secret = "${COOKIE_SECRET}"
+cookie_domains = "${OAUTH2_PROXY_COOKIE_DOMAINS}"
+cookie_expire = "8h"
+cookie_refresh = "1h"
+cookie_secure = ${OAUTH2_PROXY_COOKIE_SECURE}
+cookie_httponly = true
+cookie_samesite = "lax"
+
+## Headers injectés vers upstream
+set_xauthrequest = true
+pass_access_token = true
+pass_authorization_header = false
+pass_user_headers = true
+
+# Headers disponibles pour les applications:
+# X-Forwarded-User: email de l'utilisateur
+# X-Forwarded-Email: email
+# X-Forwarded-Groups: groupes (comma-separated)
+# X-Forwarded-Preferred-Username: username
+
+## Session storage
+# Utiliser Redis pour eviter les problemes de taille de cookie (>4KB)
+# Les sessions sont stockees dans Redis, seul l'ID est dans le cookie
+session_store_type = "redis"
+redis_connection_url = "redis://oauth2-redis:6379"
+
+## Métriques Prometheus
+metrics_address = ":9090"
+
+## Logging
+request_logging = true
+auth_logging = true
+standard_logging = true
+logging_filename = ""
+logging_max_size = 100
+logging_max_age = 7
+logging_local_time = true
+logging_compress = true
+
+## Email domains (accepter tous)
+email_domains = "*"
+
+## Whitelist des domaines autorisés pour les redirections (logout, etc.)
+whitelist_domains = [".${DOMAIN}", "${KEYCLOAK_HOST}"]
+
+## Autorisation par groupes (optionnel, déléguer aux apps via nginx)
+# Si vous voulez filtrer au niveau oauth2-proxy (non recommandé):
+# allowed_groups = ["admin-infra", "admin-standard", "utilisateurs"]
+
+## Reverse Proxy Configuration
+reverse_proxy = true
+real_client_ip_header = "X-Real-IP"
+
+## Timeouts
+ping_path = "/ping"
+ready_path = "/ready"

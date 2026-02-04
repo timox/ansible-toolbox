@@ -1,0 +1,17 @@
+---
+# =============================================================================
+# DOCKER_APP - Directory Creation
+# =============================================================================
+# Creates directories listed in docker_app_directories.
+# Items can be strings (path only) or dicts with path/owner/group/mode.
+
+- name: Ensure directories exist for {{ docker_app_name }}
+  ansible.builtin.file:
+    path: "{{ (item is string) | ternary(item, item.path) }}"
+    state: directory
+    owner: "{{ item.owner | default(omit) }}"
+    group: "{{ item.group | default(omit) }}"
+    mode: "{{ item.mode | default('0755') }}"
+  loop: "{{ docker_app_directories }}"
+  loop_control:
+    label: "{{ (item is string) | ternary(item, item.path) }}"

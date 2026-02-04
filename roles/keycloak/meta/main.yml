@@ -1,0 +1,22 @@
+---
+# =============================================================================
+# Role keycloak - Metadata
+# =============================================================================
+
+galaxy_info:
+  author: Portail Securise Team
+  description: Deploy and manage Keycloak Identity Provider
+  license: MIT
+  min_ansible_version: "2.12"
+  platforms:
+    - name: Debian
+      versions:
+        - bullseye
+        - bookworm
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+
+dependencies:
+  - role: common

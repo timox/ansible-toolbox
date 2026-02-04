@@ -1,0 +1,47 @@
+---
+# =============================================================================
+# GUACAMOLE - Prerequisite Validation
+# =============================================================================
+
+- name: Validate required variables are defined
+  ansible.builtin.assert:
+    that:
+      - keycloak_issuer is defined
+      - keycloak_issuer | length > 0
+      - domain is defined
+      - domain | length > 0
+      - guacamole_oidc_client_id is defined
+      - guacamole_oidc_client_id | length > 0
+      - guacamole_db_password is defined
+      - guacamole_db_password | length > 0
+    fail_msg: "Required variables missing. Check keycloak_issuer, domain, guacamole_oidc_client_id, guacamole_db_password"
+
+- name: Validate KEYCLOAK_ISSUER format
+  ansible.builtin.assert:
+    that:
+      - keycloak_issuer is match('^https?://')
+      - keycloak_issuer is match('.*/realms/[^/]+$')
+    fail_msg: "KEYCLOAK_ISSUER must be in format: https://keycloak.example.com/realms/portal"
+
+- name: Ensure guacamole data directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ guacamole_config_dir }}"
+    - "{{ guacamole_postgres_data_path }}"
+    - "{{ data_dir }}/guacamole/drive"
+    - "{{ data_dir }}/guacamole/record"
+    - "{{ data_dir }}/guacamole/extensions"
+    - "{{ data_dir }}/logs/guacamole"
+
+- name: Set PostgreSQL data directory ownership
+  ansible.builtin.file:
+    path: "{{ guacamole_postgres_data_path }}"
+    owner: "{{ postgres_data_uid }}"
+    group: "{{ postgres_data_gid }}"
+    mode: '0700'
+  when:
+    - postgres_data_uid is defined
+    - postgres_data_gid is defined

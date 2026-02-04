@@ -1,0 +1,63 @@
+---
+# =============================================================================
+# PORTAL-DEPLOY-SERVICE.YML - Deploiement d'un service individuel
+# =============================================================================
+# Equivalent de deploy.sh --service <nom>
+#
+# Usage:
+#   ansible-playbook playbooks/portal-deploy-service.yml -e service=keycloak
+#   ansible-playbook playbooks/portal-deploy-service.yml -e service=vaultwarden
+#   ansible-playbook playbooks/portal-deploy-service.yml -e service=linshare
+#   ansible-playbook playbooks/portal-deploy-service.yml -e service=headscale -e force=true
+#
+# Services disponibles:
+#   keycloak, oauth2-proxy, guacamole, credentials-api, portal-api,
+#   vaultwarden, headscale, linshare, bookstack
+# =============================================================================
+
+- name: "Deploy service: {{ service | default('UNDEFINED') }}"
+  hosts: portal_servers
+  become: true
+
+  pre_tasks:
+    - name: Validate service parameter
+      ansible.builtin.assert:
+        that:
+          - service is defined
+          - service in ['keycloak', 'oauth2-proxy', 'guacamole', 'credentials-api',
+                        'portal-api', 'vaultwarden', 'headscale', 'linshare', 'bookstack']
+        fail_msg: >
+          Service '{{ service | default("UNDEFINED") }}' invalide.
+          Services disponibles: keycloak, oauth2-proxy, guacamole, credentials-api,
+          portal-api, vaultwarden, headscale, linshare, bookstack
+
+  roles:
+    - role: common
+      tags: [common, always]
+
+    - role: keycloak
+      when: service == 'keycloak'
+
+    - role: oauth2_proxy
+      when: service == 'oauth2-proxy'
+
+    - role: guacamole
+      when: service == 'guacamole'
+
+    - role: credentials_api
+      when: service == 'credentials-api'
+
+    - role: portal_api
+      when: service == 'portal-api'
+
+    - role: vaultwarden
+      when: service == 'vaultwarden'
+
+    - role: headscale
+      when: service == 'headscale'
+
+    - role: linshare
+      when: service == 'linshare'
+
+    - role: bookstack
+      when: service == 'bookstack'

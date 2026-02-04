@@ -1,0 +1,8 @@
+---
+# =============================================================================
+# BOOKSTACK ROLE - Defaults
+# =============================================================================
+# User-configurable defaults for BookStack deployment
+
+bookstack_state: present
+bookstack_project_name: bookstack

@@ -1,0 +1,224 @@
+/******/ (function(modules) { // webpackBootstrap
+/******/ 	// The module cache
+/******/ 	var installedModules = {};
+/******/
+/******/ 	// The require function
+/******/ 	function __webpack_require__(moduleId) {
+/******/
+/******/ 		// Check if module is in cache
+/******/ 		if(installedModules[moduleId]) {
+/******/ 			return installedModules[moduleId].exports;
+/******/ 		}
+/******/ 		// Create a new module (and put it into the cache)
+/******/ 		var module = installedModules[moduleId] = {
+/******/ 			i: moduleId,
+/******/ 			l: false,
+/******/ 			exports: {}
+/******/ 		};
+/******/
+/******/ 		// Execute the module function
+/******/ 		modules[moduleId].call(module.exports, module, module.exports, __webpack_require__);
+/******/
+/******/ 		// Flag the module as loaded
+/******/ 		module.l = true;
+/******/
+/******/ 		// Return the exports of the module
+/******/ 		return module.exports;
+/******/ 	}
+/******/
+/******/
+/******/ 	// expose the modules object (__webpack_modules__)
+/******/ 	__webpack_require__.m = modules;
+/******/
+/******/ 	// expose the module cache
+/******/ 	__webpack_require__.c = installedModules;
+/******/
+/******/ 	// define getter function for harmony exports
+/******/ 	__webpack_require__.d = function(exports, name, getter) {
+/******/ 		if(!__webpack_require__.o(exports, name)) {
+/******/ 			Object.defineProperty(exports, name, { enumerable: true, get: getter });
+/******/ 		}
+/******/ 	};
+/******/
+/******/ 	// define __esModule on exports
+/******/ 	__webpack_require__.r = function(exports) {
+/******/ 		if(typeof Symbol !== 'undefined' && Symbol.toStringTag) {
+/******/ 			Object.defineProperty(exports, name, { enumerable: true, get: getter });
+/******/ 		}
+/******/ 		Object.defineProperty(exports, '__esModule', { value: true });
+/******/ 	};
+/******/
+/******/ 	// create a fake namespace object
+/******/ 	// mode & 1: value is a module id, require it
+/******/ 	// mode & 2: merge all properties of value into the ns
+/******/ 	// mode & 4: return value when already ns object
+/******/ 	// mode & 8|1: behave like require
+/******/ 	__webpack_require__.t = function(value, mode) {
+/******/ 		if(mode & 1) value = __webpack_require__(value);
+/******/ 		if(mode & 8) return value;
+/******/ 		if((mode & 4) && typeof value === 'object' && value && value.__esModule) return value;
+/******/ 		var ns = Object.create(null);
+/******/ 		__webpack_require__.r(ns);
+/******/ 		Object.defineProperty(ns, 'default', { enumerable: true, value: value });
+/******/ 		if(mode & 2 && typeof value != 'string') for(var key in value) __webpack_require__.d(ns, key, function(key) { return value[key]; }.bind(null, key));
+/******/ 		return ns;
+/******/ 	};
+/******/
+/******/ 	// getDefaultExport function for compatibility with non-harmony modules
+/******/ 	__webpack_require__.n = function(module) {
+/******/ 		var getter = module && module.__esModule ?
+/******/ 			function getDefault() { return module['default']; } :
+/******/ 			function getModuleExports() { return module; };
+/******/ 		__webpack_require__.d(getter, 'a', getter);
+/******/ 		return getter;
+/******/ 	};
+/******/
+/******/ 	// Object.prototype.hasOwnProperty.call
+/******/ 	__webpack_require__.o = function(object, property) { return Object.prototype.hasOwnProperty.call(object, property); };
+/******/
+/******/ 	// __webpack_public_path__
+/******/ 	__webpack_require__.p = "";
+/******/
+/******/
+/******/ 	// Load entry module and return exports
+/******/ 	return __webpack_require__(__webpack_require__.s = "W6PO");
+/******/ })
+/************************************************************************/
+/******/ ({
+
+/***/ "W6PO":
+/***/ (function(module, exports) {
+
+/* eslint-disable camelcase */
+/**
+ * lsUserConfig Constant
+ * @namespace linshareUiUserApp
+ */
+(function () {
+  'use strict';
+
+  angular.module('linshareUiUserApp').constant('lsUserConfig', {
+    baseRestUrl: 'linshare/webservice/rest/user/v5',
+    debug: false,
+    localPath: 'i18n/original',
+    postLogoutUrl: null,
+    changePasswordUrl: null,
+    resetPasswordUrl: null,
+    applicationLogo: {
+      small: 'images/linshare-logo-white.svg',
+      large: 'images/ls-logo-big.svg'
+    },
+    loginBackground: 'images/bg-linshare-desktop.png',
+    languages: {
+      fr: {
+        key: 'fr',
+        fullKey: 'fr-FR',
+        country: 'Francais'
+      },
+      en: {
+        key: 'us',
+        fullKey: 'en-US',
+        country: 'English'
+      },
+      vi: {
+        key: 'vn',
+        fullKey: 'vi-VN',
+        country: 'Tieng Viet'
+      },
+      ru: {
+        key: 'ru',
+        fullKey: 'ru-RU',
+        country: 'Pyccknn'
+      }
+    },
+    extLink: {
+      enable: false,
+      newTab: true,
+      icon: 'zmdi zmdi-home',
+      href: 'http://your.link.local',
+      name: {
+        'fr-FR': 'Nom',
+        'en-US': 'Name',
+        'vi-VN': 'Ten',
+        'ru-RU': 'Imya'
+      }
+    },
+    /**
+     * Configuration for OIDC authentication
+     * - oidcForceRedirection: upon unauthenticated user event,
+     * the page will be redirected directly to OIDC authentication portal,
+     * skipping the login page
+     */
+    oidcEnabled: true,
+    oidcForceRedirection: true,
+    oidcToken: 'Oidc-Jwt',
+    oidcSetting: {
+      authority: '${KEYCLOAK_ISSUER}',
+      client_id: '${LINSHARE_OIDC_CLIENT_ID}',
+      client_secret: '${LINSHARE_OIDC_CLIENT_SECRET}',
+      scope: 'openid email profile',
+      response_type: 'code',
+      loadUserInfo: true,
+      monitorSession: false,
+      automaticSilentRenew: false
+    },
+    mobileOidcEnabled: false,
+    mobileOidcSetting: {
+      authority: '${KEYCLOAK_ISSUER}',
+      client_id: 'linshare-mobile',
+      redirect_url: 'linshare.mobile://oauthredirect',
+      post_logout_redirect_uri: 'linshare.mobile://oauthredirect',
+      response_type: 'code',
+      scope: 'openid email profile',
+      loadUserInfo: true
+    },
+    showLoginForm: true,
+    defaultWorkgroupMemberRole: 'READER',
+    defaultWorkspaceMemberRole: 'WORK_SPACE_READER',
+    menuLinks: {
+      suffix: {
+        'fr-FR': '',
+        'en-US': '',
+        'vi-VN': ''
+      },
+      disable: {
+        'MENU_TITLE.CONTACTS_LISTS': false,
+        'MENU_TITLE.GUESTS': false,
+        'MENU_TITLE.FILES': false,
+        'MENU_TITLE.RECEIVED_SHARES': false,
+        'MENU_TITLE.UPLOAD_AND_SHARE': false,
+        'MENU_TITLE.SHARED_SPACE': false
+      }
+    },
+    homePage: 'home',
+    hideHomeMenuLink: false,
+    otpConfig: {
+      type: 'totp',
+      digits: 6,
+      issuer: 'LinShare',
+      algorithm: 'SHA1',
+      period: 30
+    },
+    supportLink: {
+      enable: false,
+      url: 'https://go.crisp.chat/chat/embed/?website_id=your-website-id',
+      provider: 'crisp',
+      name: {
+        'fr-FR': 'Assistance par chatbot',
+        'en-US': 'Support via chatbot',
+        'vi-VN': 'Ho tro qua chatbot',
+        'ru-RU': 'Podderzhka cherez chat-bot'
+      }
+    },
+    saasMode: {
+      enable: false,
+      consoleUrl: 'https://console.your.app',
+      errorCodes: [50016, 55508, 31416]
+    }
+  });
+})();
+
+/***/ })
+
+/******/ });
+//# sourceMappingURL=config.js.map

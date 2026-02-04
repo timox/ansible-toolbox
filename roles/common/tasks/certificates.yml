@@ -1,0 +1,207 @@
+---
+# =============================================================================
+# Certificate handling - Equivalent deploy.sh lines 1307-1420
+# =============================================================================
+
+# --- Copy cert/key to data_dir/certs if source != destination ---
+- name: Determine cert destination path
+  ansible.builtin.set_fact:
+    cert_dest: "{{ data_dir }}/certs/{{ tls_cert_file | basename }}"
+    key_dest: "{{ data_dir }}/certs/{{ tls_key_file | basename }}"
+
+- name: Copy SSL certificate to data_dir
+  ansible.builtin.copy:
+    src: "{{ tls_cert_file }}"
+    dest: "{{ cert_dest }}"
+    mode: "0644"
+    remote_src: true
+  when: tls_cert_file != cert_dest
+
+- name: Copy SSL key to data_dir
+  ansible.builtin.copy:
+    src: "{{ tls_key_file }}"
+    dest: "{{ key_dest }}"
+    mode: "0644"
+    remote_src: true
+  when: tls_key_file != key_dest
+
+# --- Set certificate permissions ---
+- name: Set certificate file permissions
+  ansible.builtin.file:
+    path: "{{ item }}"
+    mode: "0644"
+  loop:
+    - "{{ cert_dest }}"
+    - "{{ key_dest }}"
+
+# --- Symlinks for Keycloak (expects tls.crt / tls.key) ---
+- name: Create tls.crt symlink
+  ansible.builtin.file:
+    src: "wildcard.{{ domain }}.crt"
+    dest: "{{ data_dir }}/certs/tls.crt"
+    state: link
+    force: true
+
+- name: Create tls.key symlink
+  ansible.builtin.file:
+    src: "wildcard.{{ domain }}.key"
+    dest: "{{ data_dir }}/certs/tls.key"
+    state: link
+    force: true
+
+# =============================================================================
+# CA Bundle generation (system + custom CAs + self-signed detection)
+# =============================================================================
+
+- name: Check system CA bundle exists
+  ansible.builtin.stat:
+    path: /etc/ssl/certs/ca-certificates.crt
+  register: system_ca_stat
+
+- name: Copy system CA bundle as base
+  ansible.builtin.copy:
+    src: /etc/ssl/certs/ca-certificates.crt
+    dest: "{{ data_dir }}/certs/ca-bundle.crt"
+    mode: "0644"
+    remote_src: true
+  when: system_ca_stat.stat.exists
+
+# --- Append custom CA certificates ---
+- name: Find custom CA certificates
+  ansible.builtin.find:
+    paths: "{{ data_dir }}/certs/custom-ca"
+    patterns:
+      - "*.crt"
+      - "*.pem"
+      - "*.cer"
+  register: custom_ca_files
+  when: system_ca_stat.stat.exists
+
+- name: Get CA bundle checksum before custom CA append
+  ansible.builtin.stat:
+    path: "{{ data_dir }}/certs/ca-bundle.crt"
+    checksum_algorithm: sha256
+  register: ca_bundle_before_custom
+  when:
+    - system_ca_stat.stat.exists
+    - custom_ca_files.files | default([]) | length > 0
+
+- name: Append custom CAs to bundle
+  ansible.builtin.shell: |
+    set -euo pipefail
+    echo "" >> "{{ data_dir }}/certs/ca-bundle.crt"
+    echo "# === Custom CA certificates ===" >> "{{ data_dir }}/certs/ca-bundle.crt"
+    {% for ca in custom_ca_files.files %}
+    echo "# {{ ca.path | basename }}" >> "{{ data_dir }}/certs/ca-bundle.crt"
+    cat "{{ ca.path }}" >> "{{ data_dir }}/certs/ca-bundle.crt"
+    echo "" >> "{{ data_dir }}/certs/ca-bundle.crt"
+    {% endfor %}
+  args:
+    executable: /bin/bash
+  when:
+    - system_ca_stat.stat.exists
+    - custom_ca_files.files | default([]) | length > 0
+  register: append_custom_result
+  changed_when: false
+
+- name: Get CA bundle checksum after custom CA append
+  ansible.builtin.stat:
+    path: "{{ data_dir }}/certs/ca-bundle.crt"
+    checksum_algorithm: sha256
+  register: ca_bundle_after_custom
+  when:
+    - system_ca_stat.stat.exists
+    - custom_ca_files.files | default([]) | length > 0
+
+- name: Record custom CA bundle change
+  ansible.builtin.debug:
+    msg: "CA bundle updated with custom CAs"
+  changed_when: ca_bundle_before_custom.stat.checksum != ca_bundle_after_custom.stat.checksum
+  when:
+    - system_ca_stat.stat.exists
+    - custom_ca_files.files | default([]) | length > 0
+
+# --- Self-signed wildcard detection ---
+- name: Check wildcard certificate
+  ansible.builtin.stat:
+    path: "{{ data_dir }}/certs/wildcard.{{ domain }}.crt"
+  register: wildcard_cert_stat
+
+- name: Get certificate issuer
+  ansible.builtin.command:
+    cmd: "openssl x509 -in {{ data_dir }}/certs/wildcard.{{ domain }}.crt -noout -issuer"
+  register: cert_issuer
+  changed_when: false
+  when: wildcard_cert_stat.stat.exists
+
+- name: Get certificate subject
+  ansible.builtin.command:
+    cmd: "openssl x509 -in {{ data_dir }}/certs/wildcard.{{ domain }}.crt -noout -subject"
+  register: cert_subject
+  changed_when: false
+  when: wildcard_cert_stat.stat.exists
+
+- name: Detect self-signed certificate
+  ansible.builtin.set_fact:
+    is_self_signed: "{{ (cert_issuer.stdout | regex_replace('^issuer=', '')) == (cert_subject.stdout | regex_replace('^subject=', '')) }}"
+  when: wildcard_cert_stat.stat.exists
+
+- name: Get CA bundle checksum before self-signed append
+  ansible.builtin.stat:
+    path: "{{ data_dir }}/certs/ca-bundle.crt"
+    checksum_algorithm: sha256
+  register: ca_bundle_before_selfsigned
+  when:
+    - wildcard_cert_stat.stat.exists
+    - system_ca_stat.stat.exists
+    - is_self_signed | default(false) | bool
+
+- name: Append self-signed cert to CA bundle
+  ansible.builtin.shell: |
+    set -euo pipefail
+    echo "" >> "{{ data_dir }}/certs/ca-bundle.crt"
+    echo "# === Self-signed wildcard certificate (POC) ===" >> "{{ data_dir }}/certs/ca-bundle.crt"
+    echo "# wildcard.{{ domain }}.crt" >> "{{ data_dir }}/certs/ca-bundle.crt"
+    cat "{{ data_dir }}/certs/wildcard.{{ domain }}.crt" >> "{{ data_dir }}/certs/ca-bundle.crt"
+  args:
+    executable: /bin/bash
+  when:
+    - wildcard_cert_stat.stat.exists
+    - system_ca_stat.stat.exists
+    - is_self_signed | default(false) | bool
+  register: append_selfsigned_result
+  changed_when: false
+
+- name: Get CA bundle checksum after self-signed append
+  ansible.builtin.stat:
+    path: "{{ data_dir }}/certs/ca-bundle.crt"
+    checksum_algorithm: sha256
+  register: ca_bundle_after_selfsigned
+  when:
+    - wildcard_cert_stat.stat.exists
+    - system_ca_stat.stat.exists
+    - is_self_signed | default(false) | bool
+
+- name: Record self-signed CA bundle change
+  ansible.builtin.debug:
+    msg: "CA bundle updated with self-signed wildcard certificate"
+  changed_when: ca_bundle_before_selfsigned.stat.checksum != ca_bundle_after_selfsigned.stat.checksum
+  when:
+    - wildcard_cert_stat.stat.exists
+    - system_ca_stat.stat.exists
+    - is_self_signed | default(false) | bool
+
+- name: Copy wildcard as ca.crt (self-signed is its own CA)
+  ansible.builtin.copy:
+    src: "{{ data_dir }}/certs/wildcard.{{ domain }}.crt"
+    dest: "{{ data_dir }}/certs/ca.crt"
+    mode: "0644"
+    remote_src: true
+  when:
+    - wildcard_cert_stat.stat.exists
+    - is_self_signed | default(false) | bool
+
+- name: Warn if system CA bundle not found
+  ansible.builtin.debug:
+    msg: "/etc/ssl/certs/ca-certificates.crt not found, CA bundle not generated"
+  when: not system_ca_stat.stat.exists

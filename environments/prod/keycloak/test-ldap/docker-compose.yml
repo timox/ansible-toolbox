@@ -1,0 +1,71 @@
+# =============================================================================
+# TEST LDAP - Simulation AD pour tests de federation Keycloak
+# =============================================================================
+# Usage:
+#   cd keycloak/test-ldap
+#   docker compose up -d
+#
+# Utilisateurs de test:
+#   - admin.infra@poc.local    / Test123!  -> groupe: admin-infra
+#   - admin.app@poc.local      / Test123!  -> groupe: admin-app
+#   - user.test@poc.local      / Test123!  -> groupe: utilisateurs
+#   - user.multi@poc.local     / Test123!  -> groupes: admin-app, utilisateurs
+#
+# Connexion LDAP:
+#   - URL: ldap://test-ldap:389
+#   - Bind DN: cn=admin,dc=poc,dc=local
+#   - Bind Password: admin123
+#   - Users DN: ou=users,dc=poc,dc=local
+#   - Groups DN: ou=groups,dc=poc,dc=local
+# =============================================================================
+
+services:
+  test-ldap:
+    image: osixia/openldap:1.5.0
+    container_name: test-ldap
+    environment:
+      LDAP_ORGANISATION: "POC Test Organisation"
+      LDAP_DOMAIN: "poc.local"
+      LDAP_ADMIN_PASSWORD: "admin123"
+      LDAP_CONFIG_PASSWORD: "config123"
+      LDAP_READONLY_USER: "false"
+      LDAP_TLS: "false"
+    volumes:
+      - ./ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom
+      - ldap-data:/var/lib/ldap
+      - ldap-config:/etc/ldap/slapd.d
+    ports:
+      - "389:389"
+    networks:
+      - portal-net
+      - keycloak-net
+    command: --copy-service
+    healthcheck:
+      test: ["CMD", "ldapsearch", "-x", "-H", "ldap://localhost", "-b", "dc=poc,dc=local", "-D", "cn=admin,dc=poc,dc=local", "-w", "admin123"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Interface web pour visualiser/editer LDAP (optionnel)
+  phpldapadmin:
+    image: osixia/phpldapadmin:0.9.0
+    container_name: test-ldap-admin
+    environment:
+      PHPLDAPADMIN_LDAP_HOSTS: test-ldap
+      PHPLDAPADMIN_HTTPS: "false"
+    ports:
+      - "8089:80"
+    depends_on:
+      - test-ldap
+    networks:
+      - portal-net
+
+volumes:
+  ldap-data:
+  ldap-config:
+
+networks:
+  portal-net:
+    external: true
+  keycloak-net:
+    external: true

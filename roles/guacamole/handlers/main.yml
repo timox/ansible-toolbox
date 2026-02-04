@@ -1,0 +1,25 @@
+---
+# =============================================================================
+# GUACAMOLE - Handlers
+# =============================================================================
+
+- name: restart guacamole-web
+  community.docker.docker_container:
+    name: guacamole-web
+    state: started
+    restart: true
+  listen: restart guacamole-web
+
+- name: restart guacamole-daemon
+  community.docker.docker_container:
+    name: guacamole-daemon
+    state: started
+    restart: true
+  listen: restart guacamole-daemon
+
+- name: restart guacamole-db
+  community.docker.docker_container:
+    name: guacamole-postgres
+    state: started
+    restart: true
+  listen: restart guacamole-db

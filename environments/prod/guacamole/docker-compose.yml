@@ -1,0 +1,98 @@
+# Docker Compose - Guacamole Bastion RDP/SSH
+# Intégré via oauth2-proxy pour authentification OIDC
+
+services:
+  guacamole-db:
+    image: postgres:${POSTGRES_VERSION:-15.10-alpine}
+    container_name: guacamole-postgres
+    environment:
+      POSTGRES_DB: guacamole_db
+      POSTGRES_USER: guacamole_user
+      POSTGRES_PASSWORD: ${GUACAMOLE_DB_PASSWORD}
+    volumes:
+      - /data/guacamole/postgres:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - guacamole-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U guacamole_user -d guacamole_db"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  guacamole-daemon:
+    build:
+      context: .
+      dockerfile: Dockerfile.guacd
+    image: guacamole-daemon:${GUACAMOLE_VERSION:-1.6.0}
+    container_name: guacamole-daemon
+    # network_mode: host permet à guacd d'accéder au réseau local pour RDP/SSH/VNC
+    network_mode: host
+    volumes:
+      - /data/guacamole/drive:/drive:rw
+      - /data/guacamole/record:/record:rw
+      - ./guacd.conf:/etc/guacamole/guacd.conf:ro
+      - ./guacd-entrypoint.sh:/opt/guacd/bin/entrypoint.sh:ro
+      # Certificats CA pour RDS Gateway (fichiers .crt)
+      - /data/guacamole/ca-certs:/usr/local/share/ca-certificates/custom:ro
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 2 bash -c '</dev/tcp/localhost/4822' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  guacamole-web:
+    build:
+      context: .
+      dockerfile: Dockerfile.guacamole
+    image: guacamole-web:${GUACAMOLE_VERSION:-1.6.0}
+    container_name: guacamole-web
+    ports:
+      - "${GUACAMOLE_HTTP_PORT:-8081}:8080"
+    # guacd en mode host: utiliser l'IP gateway Docker pour l'atteindre
+    extra_hosts:
+      - "guacamole-daemon:host-gateway"
+    environment:
+      GUACD_HOSTNAME: guacamole-daemon
+      POSTGRES_HOSTNAME: guacamole-db
+      POSTGRES_DATABASE: guacamole_db
+      POSTGRES_USER: guacamole_user
+      POSTGRES_PASSWORD: ${GUACAMOLE_DB_PASSWORD}
+    volumes:
+      - /data/guacamole/extensions:/opt/guacamole/extensions-extra:ro
+      # Driver PostgreSQL inclus dans l'image Docker (voir Dockerfile.guacamole)
+      # Ne pas monter /data/guacamole/lib car cela écraserait le driver JDBC
+      - /data/guacamole/guacamole.properties:/opt/guacamole/guacamole.properties:ro
+      - /data/logs/guacamole:/var/log/guacamole
+      - ./ROOT:/usr/local/tomcat/webapps/ROOT:ro
+      - ./guacamole-entrypoint.sh:/opt/guacamole-entrypoint.sh:ro
+      # Certificat CA pour validation HTTPS (OIDC)
+      - /data/certs:/certs:ro
+    restart: unless-stopped
+    networks:
+      - guacamole-net
+    depends_on:
+      guacamole-db:
+        condition: service_healthy
+      guacamole-daemon:
+        condition: service_healthy
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  # Réseau créé par deploy.sh avec subnet 172.20.2.0/24
+  guacamole-net:
+    external: true

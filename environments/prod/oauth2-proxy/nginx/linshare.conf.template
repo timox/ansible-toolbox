@@ -1,0 +1,86 @@
+# =============================================================================
+# LINSHARE - Partage de fichiers securise (OIDC natif)
+# =============================================================================
+# Architecture : nginx (SSL proxy) -> LinShare UI -> LinShare Backend -> Keycloak OIDC
+# L'authentification est geree directement par LinShare via OIDC (comme Guacamole)
+# Session Keycloak partagee avec le portail = SSO transparent
+#
+# Ce fichier est genere par deploy.sh uniquement si DEPLOY_LINSHARE=true
+
+resolver 127.0.0.11 valid=10s ipv6=off;
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name ${LINSHARE_HOSTNAME};
+
+    ssl_certificate /certs/wildcard.${DOMAIN}.crt;
+    ssl_certificate_key /certs/wildcard.${DOMAIN}.key;
+
+    # Upload de fichiers volumineux
+    client_max_body_size 100M;
+    client_body_timeout 300s;
+    proxy_request_buffering off;
+
+    # Interface utilisateur LinShare (OIDC natif, pas d'auth_request)
+    location / {
+        set $upstream_linshare_ui "http://linshare-ui-user:80";
+        proxy_pass $upstream_linshare_ui;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $server_name;
+
+        # Timeouts pour uploads
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+    }
+
+    # API Backend LinShare (pour les appels REST depuis l'UI)
+    location /linshare/ {
+        set $upstream_linshare_backend "http://linshare-backend:8080";
+        proxy_pass $upstream_linshare_backend/linshare/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Timeouts pour uploads
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        client_max_body_size 100M;
+    }
+}
+
+# LinShare Admin - Interface d'administration (OIDC natif)
+# L'authentification est geree par LinShare via OIDC
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name ${LINSHARE_ADMIN_HOSTNAME};
+
+    ssl_certificate /certs/wildcard.${DOMAIN}.crt;
+    ssl_certificate_key /certs/wildcard.${DOMAIN}.key;
+
+    # Interface administration LinShare (OIDC natif)
+    location / {
+        set $upstream_linshare_admin "http://linshare-ui-admin:80";
+        proxy_pass $upstream_linshare_admin;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $server_name;
+    }
+
+    # API Backend LinShare
+    location /linshare/ {
+        set $upstream_linshare_backend "http://linshare-backend:8080";
+        proxy_pass $upstream_linshare_backend/linshare/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}

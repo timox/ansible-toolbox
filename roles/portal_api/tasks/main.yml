@@ -1,0 +1,12 @@
+---
+- name: Generate portal configuration
+  ansible.builtin.include_tasks: generate_config.yml
+  tags:
+    - portal-api
+    - portal-api-config
+
+- name: Deploy Portal API
+  ansible.builtin.include_tasks: deploy.yml
+  tags:
+    - portal-api
+    - portal-api-deploy

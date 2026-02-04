@@ -1,0 +1,66 @@
+# =============================================================================
+# PORTAIL SÉCURISÉ - Docker Compose Principal
+# =============================================================================
+# Architecture modulaire avec includes:
+# - oauth2-proxy + nginx (reverse proxy + SSO OIDC)
+# - Guacamole (bastion RDP/SSH/VNC)
+# - Vaultwarden (gestionnaire mots de passe - optionnel)
+# - LinShare (partage de fichiers - optionnel)
+#
+# UTILISATION:
+#   docker compose up -d                        # Services core uniquement
+#   docker compose --profile vault up -d        # Avec Vaultwarden
+#   docker compose --profile all up -d          # Tous les services
+#   docker compose down                         # Arreter tous les services
+#   docker compose ps                           # Status des services
+#   docker compose logs -f [service]            # Logs en temps reel
+#
+# PREREQUIS:
+#   - Fichier .env configure (cp .env.example .env)
+#   - Certificats SSL dans /data/certs/
+#   - Keycloak configure avec client oauth2-proxy
+# =============================================================================
+
+# Inclusion des services modulaires
+include:
+  # oauth2-proxy + nginx (authentification OIDC + reverse proxy multi-apps)
+  - path: oauth2-proxy/docker-compose.yml
+    env_file: .env
+
+  # Guacamole (bastion RDP/SSH/VNC avec authentification via oauth2-proxy)
+  - path: guacamole/docker-compose.yml
+    env_file: .env
+
+  # Vaultwarden (gestionnaire mots de passe BYOV - optionnel)
+  # Activer avec: docker compose --profile vault up -d
+  - path: vaultwarden/docker-compose.yml
+    env_file: .env
+
+  # Credentials API (gestion credentials Guacamole pour le portail)
+  - path: credentials-api/docker-compose.yml
+    env_file: .env
+
+  # Portal API (backend gestion applications portail)
+  - path: portal/docker-compose.api.yml
+    env_file: .env
+
+  # LinShare (partage de fichiers securise)
+  # Controlé par --profile linshare ou DEPLOY_LINSHARE dans .env
+  # Note: Pour POC, definir LINSHARE_DB_IMAGE=linagora/linshare-database:6.0 dans .env
+  - path: linshare/docker-compose.linshare.yml
+    env_file: .env
+
+  # Headscale (VPN mesh open-source)
+  # Controlé par --profile headscale ou DEPLOY_HEADSCALE dans .env
+  - path: headscale/docker-compose.yml
+    env_file: .env
+
+  # Bookstack (Wiki / Documentation)
+  # Controlé par --profile bookstack ou DEPLOY_BOOKSTACK dans .env
+  - path: bookstack/docker-compose.yml
+    env_file: .env
+
+networks:
+  # Reseaux externes crees par deploy.sh ou les sous-stacks
+  guacamole-net:
+    external: true

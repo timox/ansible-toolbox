@@ -1,0 +1,24 @@
+---
+# =============================================================================
+# GUACAMOLE - Configuration Generation
+# =============================================================================
+
+- name: Generate guacamole.properties from template
+  ansible.builtin.template:
+    src: "{{ guacamole_properties_template }}"
+    dest: "{{ guacamole_properties_path }}"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart guacamole-web
+  no_log: true  # Contains database password
+
+- name: Verify guacamole.properties was created
+  ansible.builtin.stat:
+    path: "{{ guacamole_properties_path }}"
+  register: guacamole_properties_check
+  failed_when: not guacamole_properties_check.stat.exists
+
+- name: Display configuration status
+  ansible.builtin.debug:
+    msg: "guacamole.properties generated at {{ guacamole_properties_path }}"

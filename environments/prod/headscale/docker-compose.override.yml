@@ -1,0 +1,21 @@
+# Override Headscale pour POC
+# Reseau avec subnet qui ne conflicte pas + ports modifies
+
+services:
+  headscale:
+    ports:
+      # API/Control plane HTTPS
+      - "${HEADSCALE_HTTPS_PORT:-8443}:8443"
+      # API HTTP - port different car 8080 utilise par Keycloak
+      - "127.0.0.1:8089:8080"
+      # Metrics Prometheus
+      - "${HEADSCALE_METRICS_PORT:-9091}:9090"
+      # gRPC
+      - "127.0.0.1:50443:50443"
+
+networks:
+  headscale-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.30.0/24

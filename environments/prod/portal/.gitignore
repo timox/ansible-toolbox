@@ -1,0 +1,12 @@
+# Environment files
+.env
+
+# Generated nginx config
+nginx/portal.conf
+
+# Logs
+logs/
+*.log
+
+# Docker volumes
+volumes/

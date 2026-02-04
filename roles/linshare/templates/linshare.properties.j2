@@ -1,0 +1,129 @@
+# =============================================================================
+# LINSHARE CONFIGURATION WITH OIDC ENABLED
+# =============================================================================
+# Ce fichier active OIDC pour l'authentification avec Keycloak
+# Documentation: https://github.com/linagora/linshare/blob/master/documentation/EN/installation/sso-lemonldap-using-OIDC-opaque-tokens.md
+# =============================================================================
+
+#******************** MAIL CONFIGURATION TO SEND MAIL INFORMATION TO USER
+
+mail.smtp.host={{ linshare_smtp_host }}
+mail.smtp.port={{ linshare_smtp_port }}
+mail.smtp.user={{ linshare_smtp_user }}
+mail.smtp.password={{ linshare_smtp_password }}
+mail.smtp.auth.needed={{ 'true' if linshare_smtp_auth else 'false' }}
+mail.smtp.charset=UTF-8
+mail.smtp.starttls.enable={{ 'true' if linshare_smtp_tls else 'false' }}
+mail.smtp.ssl.protocols=TLSv1.3 TLSv1.2
+mail.smtp.ssl.enable=false
+
+#******************** DATABASE
+### PostgreSQL
+linshare.db.username={{ linshare_postgres_user }}
+linshare.db.password={{ vault_linshare_db_password }}
+linshare.db.driver.class=org.postgresql.Driver
+linshare.db.url=jdbc:postgresql://{{ linshare_postgres_host }}:{{ linshare_postgres_port }}/{{ linshare_postgres_database }}
+linshare.db.dialect=org.hibernate.dialect.PostgreSQLDialect
+
+linshare.db.show_sql=false
+linshare.db.format_sql=false
+linshare.db.gen_stats=false
+linshare.db.hbm2ddl.auto=validate
+
+#******************** GENERAL PROPERTIES
+
+######## Storage options ########
+linshare.documents.storage.mode=filesystem
+linshare.documents.storage.bucket=linshare
+linshare.encipherment.tmp.dir=/var/lib/linshare/tmp
+linshare.documents.storage.filesystem.directory=/var/lib/linshare/filesystemstorage
+
+#### Object storage options ####
+linshare.documents.storage.identity=
+linshare.documents.storage.user.domain=
+linshare.documents.storage.user.name=
+linshare.documents.storage.credential=
+linshare.documents.storage.keystone.version=2
+linshare.documents.storage.project.name=
+linshare.documents.storage.endpoint=
+linshare.documents.storage.regionId=
+linshare.documents.storage.multipartupload=true
+linshare.documents.storage.forceS3SignatureVersion=0
+
+#### Mongo storage options ####
+linshare.mongo.connect.timeout=30000
+linshare.mongo.socket.timeout=30000
+linshare.mongo.write.concern=MAJORITY
+
+#### connection for data
+linshare.mongo.data.replicaset={{ linshare_mongodb_host }}:{{ linshare_mongodb_port }}
+linshare.mongo.data.database={{ linshare_mongodb_database }}
+linshare.mongo.data.credentials={{ linshare_mongodb_user }}:{{ vault_linshare_mongo_password }}@admin
+
+#### connection for small files
+linshare.mongo.smallfiles.replicaset={{ linshare_mongodb_host }}:{{ linshare_mongodb_port }}
+linshare.mongo.smallfiles.database={{ linshare_mongodb_database }}-files
+linshare.mongo.smallfiles.credentials={{ linshare_mongodb_user }}:{{ vault_linshare_mongo_password }}@admin
+
+#### connection for big files
+linshare.mongo.bigfiles.replicaset={{ linshare_mongodb_host }}:{{ linshare_mongodb_port }}
+linshare.mongo.bigfiles.database={{ linshare_mongodb_database }}-bigfiles
+linshare.mongo.bigfiles.credentials={{ linshare_mongodb_user }}:{{ vault_linshare_mongo_password }}@admin
+
+#******************** BATCH AND CRON
+job.uploadrequest.cron.expression=0 0 * ? * *
+
+# webservice
+webservice.attachment-memory-threshold=4000000
+webservice.attachment-directory=/tmp/
+
+#******************** VIRUS SCANNER
+virusscanner.clamav.host={{ linshare_clamav_host }}
+virusscanner.clamav.port={{ linshare_clamav_port }}
+
+#******************** SSO
+sso.header.user=Auth-User
+sso.header.allowfrom.enable=true
+sso.header.allowfrom=nginx-apps,172.16.0.0/12,192.168.0.0/16,10.0.0.0/8
+
+#******** Domain
+linshare.multidomain.enable=false
+
+# enable file size validation on rest API
+linshare.rest.files.size.validation=true
+
+#mail attachment size limit
+mail.attchment.limit.size=393216
+
+#******** LinThumbnail configuration
+linshare.linthumbnail.dropwizard.server=http://{{ linshare_thumbnail_host }}:{{ linshare_thumbnail_port }}/linthumbnail?mimeType=%1$s
+linshare.documents.thumbnail.pdf.enable=true
+linshare.documents.thumbnail.enable=true
+
+# JWT support
+jwt.expiration=300
+jwt.token.max-lifetime=28800
+
+#******** Production Mode
+linshare.mode.production=true
+
+# =============================================================================
+# OIDC AUTHENTICATION - ENABLED
+# =============================================================================
+# Configuration for Keycloak OIDC authentication
+# =============================================================================
+
+oidc.on=true
+oidc.issuerUri={{ keycloak_issuer }}
+oidc.client.id={{ linshare_oidc_client_id }}
+oidc.client.secret={{ vault_linshare_oidc_client_secret }}
+
+# For opaque tokens (LinShare 6.0.2+)
+# Note: property name has typo "lengh" not "length" - this is intentional
+# Set to value greater than actual token length to enable opaque token mode
+oidc.opaqueToken.lengh=2000
+
+# Optional: access claim validation
+# oidc.access.claim.value=linshare
+
+linshare.display.licenceTerm=true

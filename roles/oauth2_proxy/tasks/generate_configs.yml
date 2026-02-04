@@ -1,0 +1,62 @@
+---
+# =============================================================================
+# oauth2_proxy Role - Config Generation Tasks
+# =============================================================================
+# Generate oauth2-proxy.cfg and nginx configs from Jinja2 templates
+
+- name: Ensure oauth2-proxy config directory exists
+  ansible.builtin.file:
+    path: "{{ oauth2_proxy_config_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Ensure nginx conf.d directory exists
+  ansible.builtin.file:
+    path: "{{ oauth2_proxy_nginx_conf_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Generate oauth2-proxy.cfg from template
+  ansible.builtin.template:
+    src: oauth2-proxy.cfg.j2
+    dest: "{{ oauth2_proxy_config_file }}"
+    owner: root
+    group: root
+    mode: '0644'
+  no_log: true
+  notify: restart oauth2-proxy
+
+- name: Generate nginx apps.conf from template
+  ansible.builtin.template:
+    src: apps.conf.j2
+    dest: "{{ oauth2_proxy_nginx_conf_dir }}/apps.conf"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: reload nginx-apps
+
+- name: Generate portal config.json from template
+  ansible.builtin.template:
+    src: config.json.j2
+    dest: "{{ oauth2_proxy_portal_web_dir }}/config.json"
+    owner: root
+    group: root
+    mode: '0644'
+  vars:
+    build_date: "{{ ansible_date_time.iso8601 }}"
+    portal_admin_group: "{{ admin_group }}"
+    vaultwarden_enabled: "{{ oauth2_proxy_deploy_vaultwarden }}"
+  when: oauth2_proxy_portal_web_dir is directory
+
+- name: Validate nginx configuration
+  ansible.builtin.command:
+    cmd: docker exec {{ oauth2_proxy_nginx_container_name }} nginx -t
+  register: nginx_validation
+  changed_when: false
+  failed_when: false
+  when: oauth2_proxy_nginx_container_name in ansible_facts.docker_containers | default([])
+
+- name: Display nginx validation result
+  ansible.builtin.debug:
+    msg: "Nginx config validation: {{ nginx_validation.stdout if nginx_validation.rc == 0 else nginx_validation.stderr }}"
+  when: nginx_validation is defined and nginx_validation.rc is defined

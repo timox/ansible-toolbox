@@ -1,0 +1,5 @@
+---
+# Ansible-lint configuration for guacamole role
+skip_list:
+  - yaml[line-length]  # Allow longer lines in templates
+  - jinja[spacing]     # Allow flexible Jinja spacing

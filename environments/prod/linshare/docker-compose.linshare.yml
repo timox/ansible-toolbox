@@ -1,0 +1,275 @@
+version: '3.8'
+
+# LinShare - Partage de fichiers sécurisé
+# Intégration avec oauth2-proxy (reverse proxy) et Keycloak (OIDC)
+#
+# Architecture :
+# - linshare-db : PostgreSQL pour les métadonnées
+# - linshare-mongodb : MongoDB pour le stockage des fichiers
+# - linshare-backend : API REST LinShare
+# - linshare-ui-user : Interface utilisateur
+# - linshare-ui-admin : Interface administration
+# - linshare-smtp : Serveur mail pour notifications (optionnel)
+# - linshare-thumbnail : Génération de miniatures
+# - linshare-antivirus : ClamAV pour scan antivirus
+
+services:
+  # ===========================================================================
+  # BASE DE DONNÉES POSTGRESQL
+  # ===========================================================================
+  linshare-db:
+    # Pour POC avec données existantes PostgreSQL 13: LINSHARE_DB_IMAGE=linagora/linshare-database:6.0
+    image: ${LINSHARE_DB_IMAGE:-postgres:15.10-alpine}
+    container_name: linshare-postgres
+    profiles: ["linshare"]
+    environment:
+      POSTGRES_DB: linshare
+      POSTGRES_USER: linshare
+      POSTGRES_PASSWORD: ${LINSHARE_DB_PASSWORD:-changeme}
+    volumes:
+      - /data/linshare/postgres:/var/lib/postgresql/data
+      # L'image linagora/linshare-database:6.x inclut les scripts d'init
+      # Ne PAS monter de fichiers locaux par-dessus (écrase les scripts intégrés)
+    networks:
+      - linshare-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U linshare"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ===========================================================================
+  # MONGODB - STOCKAGE FICHIERS
+  # ===========================================================================
+  linshare-mongodb:
+    image: mongo:${MONGO_VERSION:-6.0}
+    container_name: linshare-mongodb
+    profiles: ["linshare"]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: linshare
+      MONGO_INITDB_ROOT_PASSWORD: ${LINSHARE_MONGO_PASSWORD:-changeme}
+      MONGO_INITDB_DATABASE: linshare
+      LINSHARE_MONGO_PASSWORD: ${LINSHARE_MONGO_PASSWORD:-changeme}
+    volumes:
+      - /data/linshare/mongodb:/data/db
+      - ./init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+    networks:
+      - linshare-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ===========================================================================
+  # LINSHARE BACKEND (API)
+  # ===========================================================================
+  linshare-backend:
+    image: linagora/linshare-backend:${LINSHARE_VERSION:-6.0}
+    container_name: linshare-backend
+    profiles: ["linshare"]
+    environment:
+      # Base de données PostgreSQL
+      POSTGRES_HOST: linshare-db
+      POSTGRES_PORT: 5432
+      POSTGRES_DATABASE: linshare
+      POSTGRES_USER: linshare
+      POSTGRES_PASSWORD: ${LINSHARE_DB_PASSWORD:-changeme}
+
+      # MongoDB - Configuration (using REPLICA_SET format)
+      MONGODB_DATA_REPLICA_SET: linshare-mongodb:27017
+      MONGODB_SMALLFILES_REPLICA_SET: linshare-mongodb:27017
+      MONGODB_USER: linshare
+      MONGODB_PASSWORD: ${LINSHARE_MONGO_PASSWORD:-changeme}
+      THUMBNAIL_ENABLE: "true"
+
+      # Configuration SMTP (optionnel, pour notifications)
+      SMTP_HOST: ${LINSHARE_SMTP_HOST:-linshare-smtp}
+      SMTP_PORT: ${LINSHARE_SMTP_PORT:-25}
+      SMTP_USER: ${LINSHARE_SMTP_USER:-}
+      SMTP_PASSWORD: ${LINSHARE_SMTP_PASSWORD:-}
+      SMTP_FROM: ${LINSHARE_SMTP_FROM:-noreply@example.com}
+
+      # SSO Header-based (via oauth2-proxy + nginx)
+      # Auth-User header contient l'email de l'utilisateur authentifie
+      SSO_IP_LIST_ENABLE: "true"
+      SSO_IP_LIST: "nginx-apps,172.16.0.0/12,192.168.0.0/16,10.0.0.0/8"
+
+      # Keycloak OIDC - Configuration (optionnel, SSO header prend precedence)
+      OIDC_ENABLED: "false"
+      OIDC_ISSUER_URI: ${KEYCLOAK_ISSUER}
+      OIDC_CLIENT_ID: ${LINSHARE_OIDC_CLIENT_ID:-linshare}
+      OIDC_CLIENT_SECRET: ${LINSHARE_OIDC_CLIENT_SECRET}
+      OIDC_REDIRECT_URI: https://linshare.${DOMAIN}/oidc/callback
+      OIDC_SCOPE: openid email profile groups
+
+      # Configuration générale
+      LINSHARE_URL: https://linshare.${DOMAIN}
+      LINSHARE_ADMIN_EMAIL: ${LINSHARE_ADMIN_EMAIL:-admin@example.com}
+
+      # Limites de stockage
+      LINSHARE_MAX_FILE_SIZE: ${LINSHARE_MAX_FILE_SIZE:-100000000}  # 100 MB par défaut
+      LINSHARE_QUOTA_DEFAULT: ${LINSHARE_QUOTA_DEFAULT:-10000000000}  # 10 GB par défaut
+
+      # Antivirus ClamAV
+      CLAMAV_HOST: linshare-antivirus
+      CLAMAV_PORT: 3310
+
+      # Thumbnail service
+      THUMBNAIL_HOST: linshare-thumbnail
+      THUMBNAIL_PORT: 8080
+
+      # Java Options
+      # Truststore avec certificat Keycloak auto-signé
+      JAVA_OPTS: "-Xms512m -Xmx2048m -Djavax.net.ssl.trustStore=/opt/linshare/certs/cacerts -Djavax.net.ssl.trustStorePassword=changeit"
+
+      # Spring profiles - jcloud requis pour le stockage fichiers
+      # Note: SSO header-based s'active via linshare-extra.properties, pas via Spring profile
+      # SPRING_PROFILES_ACTIVE: "default,jcloud,batches"  # Defini dans override
+
+    volumes:
+      - /data/linshare/files:/var/lib/linshare/filesystemstorage
+      - /data/linshare/logs:/var/log/linshare
+      - /data/logs/linshare:/var/log/linshare
+      # Configuration principale avec OIDC activé (générée par deploy.sh)
+      - /data/linshare/config/linshare.properties:/etc/linshare/linshare.properties:ro
+      # SSO Header-based via oauth2-proxy
+      - /data/linshare/config/linshare-extra.properties:/etc/linshare/linshare-extra.properties:ro
+      # Truststore Java avec certificat Keycloak
+      - /data/linshare/certs/cacerts:/opt/linshare/certs/cacerts:ro
+    networks:
+      - linshare-net
+      - apps-net
+    depends_on:
+      linshare-db:
+        condition: service_healthy
+      linshare-mongodb:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      # Note: /actuator/health retourne 401 (requiert auth), utiliser endpoint racine
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/linshare/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ===========================================================================
+  # LINSHARE UI USER (Interface utilisateur)
+  # ===========================================================================
+  linshare-ui-user:
+    image: linagora/linshare-ui-user:${LINSHARE_VERSION:-6.0}
+    container_name: linshare-ui-user
+    profiles: ["linshare"]
+    environment:
+      # Variables attendues par l'image linshare-ui-user
+      TOMCAT_URL: linshare-backend
+      TOMCAT_PORT: 8080
+      # Variables additionnelles
+      BACKEND_HOST: linshare-backend
+      BACKEND_PORT: 8080
+      EXTERNAL_URL: https://linshare.${DOMAIN}
+    volumes:
+      - ./config/config.js:/usr/local/apache2/htdocs/linshare-ui-user/config/config.js:ro
+    networks:
+      - linshare-net
+      - apps-net
+      - portal-net
+    ports:
+      - "${LINSHARE_USER_PORT:-8082}:80"
+    depends_on:
+      - linshare-backend
+    restart: unless-stopped
+
+  # ===========================================================================
+  # LINSHARE UI ADMIN (Interface administration)
+  # ===========================================================================
+  linshare-ui-admin:
+    image: linagora/linshare-ui-admin:${LINSHARE_VERSION:-6.0}
+    container_name: linshare-ui-admin
+    profiles: ["linshare"]
+    environment:
+      # Variables attendues par l'image linshare-ui-admin
+      TOMCAT_URL: linshare-backend
+      TOMCAT_PORT: 8080
+      # Variables additionnelles
+      BACKEND_HOST: linshare-backend
+      BACKEND_PORT: 8080
+      EXTERNAL_URL: https://linshare-admin.${DOMAIN}
+    volumes:
+      - ./config/config-admin.js:/usr/local/apache2/htdocs/linshare-ui-admin/new/config/config.js:ro
+    networks:
+      - linshare-net
+      - apps-net
+    ports:
+      - "${LINSHARE_ADMIN_PORT:-8083}:80"
+    depends_on:
+      - linshare-backend
+    restart: unless-stopped
+
+  # ===========================================================================
+  # CLAMAV ANTIVIRUS
+  # ===========================================================================
+  linshare-antivirus:
+    image: clamav/clamav:${CLAMAV_VERSION:-1.4}
+    container_name: linshare-clamav
+    profiles: ["linshare"]
+    environment:
+      CLAMAV_NO_FRESHCLAM: "false"  # Activer les mises à jour automatiques
+    volumes:
+      - /data/linshare/clamav:/var/lib/clamav
+    networks:
+      - linshare-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/clamdcheck.sh"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+  # ===========================================================================
+  # THUMBNAIL SERVICE
+  # ===========================================================================
+  linshare-thumbnail:
+    image: linagora/linshare-thumbnail-server:2.0
+    container_name: linshare-thumbnail
+    profiles: ["linshare"]
+    networks:
+      - linshare-net
+    restart: unless-stopped
+
+  # ===========================================================================
+  # SMTP SERVER (Optionnel - pour notifications)
+  # ===========================================================================
+  linshare-smtp:
+    image: axigen/axigen:10.5
+    container_name: linshare-smtp
+    environment:
+      SMTP_RELAY_HOST: ${SMTP_RELAY_HOST:-}
+      SMTP_RELAY_PORT: ${SMTP_RELAY_PORT:-587}
+      SMTP_RELAY_USER: ${SMTP_RELAY_USER:-}
+      SMTP_RELAY_PASSWORD: ${SMTP_RELAY_PASSWORD:-}
+    networks:
+      - linshare-net
+    restart: unless-stopped
+    profiles:
+      - smtp  # Activer avec: docker-compose --profile smtp up
+
+networks:
+  # Réseau LinShare interne - créé par deploy.sh principal
+  linshare-net:
+    external: true
+    name: linshare_linshare-net
+
+  # Réseau oauth2-proxy existant (déclaré comme external)
+  # Créé par deploy.sh principal
+  apps-net:
+    external: true
+    name: prod_apps-net
+
+  # Réseau portal pour nginx-apps
+  portal-net:
+    external: true

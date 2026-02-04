@@ -1,0 +1,38 @@
+---
+# =============================================================================
+# Generate Headscale Configuration Files from Templates
+# =============================================================================
+
+- name: Generate Headscale config.yaml
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: "{{ headscale_config_dir }}/config.yaml"
+    mode: '0644'
+  vars:
+    headscale_hostname_resolved: "{{ headscale_hostname | default('vpn.' + domain, true) }}"
+  no_log: true
+  notify:
+    - restart headscale
+
+- name: Generate Headplane headplane.yaml
+  ansible.builtin.template:
+    src: headplane.yaml.j2
+    dest: "{{ headscale_config_dir }}/headplane.yaml"
+    mode: '0644'
+  vars:
+    headscale_hostname_resolved: "{{ headscale_hostname | default('vpn.' + domain, true) }}"
+  no_log: true
+  notify:
+    - restart headplane
+
+- name: Verify config.yaml was generated
+  ansible.builtin.stat:
+    path: "{{ headscale_config_dir }}/config.yaml"
+  register: headscale_config_check
+  failed_when: not headscale_config_check.stat.exists
+
+- name: Verify headplane.yaml was generated
+  ansible.builtin.stat:
+    path: "{{ headscale_config_dir }}/headplane.yaml"
+  register: headplane_config_check
+  failed_when: not headplane_config_check.stat.exists

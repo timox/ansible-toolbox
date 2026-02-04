@@ -1,0 +1,17 @@
+---
+# =============================================================================
+# PORTAL API ROLE - Handlers
+# =============================================================================
+# Event-triggered tasks for Portal API
+
+- name: restart portal-api
+  community.docker.docker_compose_v2:
+    project_src: "{{ prod_dir }}/portal"
+    project_name: "{{ portal_api_project_name }}"
+    files:
+      - docker-compose.api.yml
+    env_files:
+      - "{{ env_file }}"
+    services:
+      - portal-api
+    state: restarted

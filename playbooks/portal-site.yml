@@ -1,0 +1,96 @@
+---
+# =============================================================================
+# PORTAL-SITE.YML - Playbook master de deploiement complet
+# =============================================================================
+# Equivalent de deploy.sh - deploie toute l'infrastructure portail
+#
+# Usage:
+#   ansible-playbook playbooks/portal-site.yml                    # Deploiement complet
+#   ansible-playbook playbooks/portal-site.yml --tags core        # Services core uniquement
+#   ansible-playbook playbooks/portal-site.yml --tags keycloak    # Keycloak seul
+#   ansible-playbook playbooks/portal-site.yml --check --diff     # Dry run
+#
+# Ordre de deploiement:
+#   1. common       (prereqs, certs, secrets, networks)
+#   2. keycloak     (identity provider - requis par tous les services OIDC)
+#   3. oauth2_proxy (auth + nginx reverse proxy)
+#   4. guacamole    (bastion RDP/SSH/VNC)
+#   5. credentials_api (stockage mots de passe)
+#   6. portal_api   (portail web + API)
+#   7. vaultwarden  (gestionnaire mots de passe)
+#   8. headscale    (VPN mesh)
+#   9. linshare     (partage fichiers)
+#  10. bookstack    (wiki)
+# =============================================================================
+
+- name: Deploy Portail Securise - Infrastructure complete
+  hosts: portal_servers
+  become: true
+
+  roles:
+    # =========================================================================
+    # Phase 1 : Infrastructure de base
+    # =========================================================================
+    - role: common
+      tags: [common, always]
+
+    # =========================================================================
+    # Phase 2 : Identity Provider (doit demarrer en premier)
+    # =========================================================================
+    - role: keycloak
+      tags: [keycloak, identity, core]
+
+    # =========================================================================
+    # Phase 3 : Services core (auth + reverse proxy)
+    # =========================================================================
+    - role: oauth2_proxy
+      tags: [oauth2-proxy, auth, core]
+
+    # =========================================================================
+    # Phase 4 : Applications core
+    # =========================================================================
+    - role: guacamole
+      when: deploy_guacamole | bool
+      tags: [guacamole, core]
+
+    - role: credentials_api
+      when: deploy_credentials_api | bool
+      tags: [credentials-api, core]
+
+    - role: portal_api
+      tags: [portal-api, portal, core]
+
+    # =========================================================================
+    # Phase 5 : Services optionnels
+    # =========================================================================
+    - role: vaultwarden
+      when: deploy_vaultwarden | bool
+      tags: [vaultwarden, optional]
+
+    - role: headscale
+      when: deploy_headscale | bool
+      tags: [headscale, vpn, optional]
+
+    - role: linshare
+      when: deploy_linshare | bool
+      tags: [linshare, optional]
+
+    - role: bookstack
+      when: deploy_bookstack | bool
+      tags: [bookstack, optional]
+
+  # ===========================================================================
+  # Post-deploiement : verification sante
+  # ===========================================================================
+  post_tasks:
+    - name: List running containers
+      ansible.builtin.command:
+        cmd: docker ps --format "table {{ '{{' }}.Names{{ '}}' }}\t{{ '{{' }}.Status{{ '}}' }}"
+      register: docker_ps
+      changed_when: false
+      tags: [always, health]
+
+    - name: Display running services
+      ansible.builtin.debug:
+        msg: "{{ docker_ps.stdout_lines }}"
+      tags: [always, health]

@@ -1,0 +1,18 @@
+---
+galaxy_info:
+  author: Portail Securise Team
+  description: Deploy OIDCWarden (Vaultwarden fork) with advanced OIDC SSO
+  license: MIT
+  min_ansible_version: "2.12"
+  platforms:
+    - name: Debian
+      versions:
+        - bullseye
+        - bookworm
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+
+dependencies:
+  - role: common

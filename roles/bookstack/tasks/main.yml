@@ -1,0 +1,7 @@
+---
+- name: Deploy BookStack
+  ansible.builtin.include_tasks: deploy.yml
+  when: deploy_bookstack | bool
+  tags:
+    - bookstack
+    - bookstack-deploy

@@ -1,0 +1,74 @@
+# =============================================================================
+# BOOKSTACK - Wiki / Documentation interne
+# =============================================================================
+# Image: LinuxServer.io BookStack
+# Documentation: https://docs.linuxserver.io/images/docker-bookstack/
+#
+# UTILISATION:
+#   docker compose up -d        # Demarrer BookStack
+#   docker compose down         # Arreter BookStack
+#   docker compose logs -f      # Logs en temps reel
+#
+# PREREQUIS:
+#   - Fichier .env configure (cp .env.example .env)
+#   - Base de donnees MariaDB/MySQL accessible
+# =============================================================================
+
+services:
+  bookstack:
+    image: lscr.io/linuxserver/bookstack:${BOOKSTACK_VERSION:-24.10.1}
+    container_name: bookstack
+    profiles: ["bookstack"]
+    environment:
+      - PUID=${PUID:-1001}
+      - PGID=${PGID:-1001}
+      - TZ=${TZ:-Europe/Paris}
+      - APP_URL=${BOOKSTACK_APP_URL}
+      - DB_HOST=${BOOKSTACK_DB_HOST}
+      - DB_PORT=${BOOKSTACK_DB_PORT:-3306}
+      - DB_USER=${BOOKSTACK_DB_USER}
+      - DB_PASS=${BOOKSTACK_DB_PASS}
+      - DB_DATABASE=${BOOKSTACK_DB_DATABASE:-bookstack}
+      # Redis cache
+      - CACHE_DRIVER=redis
+      - SESSION_DRIVER=${BOOKSTACK_SESSION_DRIVER:-redis}
+      - REDIS_SERVERS=bookstack-redis:6379:0
+    volumes:
+      - ${BOOKSTACK_CONFIG_PATH:-/data/bookstack_config}:/config
+    ports:
+      - "${BOOKSTACK_PORT:-80}:80"
+    restart: unless-stopped
+    networks:
+      - bookstack-net
+    depends_on:
+      bookstack-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  bookstack-redis:
+    image: redis:${REDIS_VERSION:-7.4-alpine}
+    container_name: bookstack-redis
+    profiles: ["bookstack"]
+    volumes:
+      - bookstack-redis-data:/data
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+    restart: unless-stopped
+    networks:
+      - bookstack-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  bookstack-redis-data:
+
+networks:
+  bookstack-net:
+    driver: bridge

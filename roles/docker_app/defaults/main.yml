@@ -1,0 +1,73 @@
+---
+# =============================================================================
+# DOCKER_APP ROLE - Default Variables
+# =============================================================================
+# Generic role for deploying Docker Compose applications.
+# Provides a standard lifecycle: validate -> dirs -> configs -> deploy -> health.
+
+# -- Identity ----------------------------------------------------------------
+
+# Application name (required)
+docker_app_name: ""
+
+# Service state: present (deploy) or absent (remove)
+docker_app_state: present
+
+# -- Docker Compose ----------------------------------------------------------
+
+# Directory containing docker-compose.yml (required)
+docker_app_compose_dir: ""
+
+# Docker Compose project name (defaults to docker_app_name)
+docker_app_compose_project: "{{ docker_app_name }}"
+
+# Compose files to use (relative to docker_app_compose_dir)
+docker_app_compose_files:
+  - docker-compose.yml
+
+# Compose profiles to activate (empty = none)
+docker_app_compose_profiles: []
+
+# .env files to pass to docker compose
+docker_app_env_files: []
+
+# -- Directories to create ---------------------------------------------------
+
+# List of directories to ensure exist before deployment.
+# Each item can be a string (path) or a dict with keys: path, owner, group, mode
+docker_app_directories: []
+
+# -- Templates to generate ---------------------------------------------------
+
+# List of template configs to render before deployment.
+# Each item is a dict:
+#   src:    template source (resolved relative to the calling role's templates/)
+#   dest:   destination path on the target
+#   notify: handler name to trigger on change (optional)
+#   mode:   file permissions (default: '0644')
+#   no_log: hide content in logs (default: false)
+docker_app_templates: []
+
+# -- Health checks ------------------------------------------------------------
+
+# List of health checks to run after deployment.
+# Each item is a dict:
+#   type:      docker_health | docker_running | uri
+#   container: container name (for docker_health / docker_running)
+#   url:       URL to check (for uri)
+#   status_code: expected HTTP status (for uri, default: 200)
+#   retries:   max attempts (default: 30)
+#   delay:     seconds between attempts (default: 5)
+docker_app_health_checks: []
+
+# -- Containers (for restart handler) ----------------------------------------
+
+# List of containers the role manages, used to generate restart handlers.
+# Each item is a dict:
+#   name:    container name (required)
+docker_app_containers: []
+
+# -- Removal options ----------------------------------------------------------
+
+# Whether to remove generated config files on state=absent
+docker_app_remove_configs: true

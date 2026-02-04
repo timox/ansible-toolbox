@@ -1,0 +1,155 @@
+---
+# =============================================================================
+# PORTAIL SECURISE - Variables publiques Ansible
+# =============================================================================
+# Source: .env.example - toutes les variables non-secretes
+# Les secrets sont dans vault.yml
+
+# CONFIGURATION GLOBALE
+domain: timox.org
+prod_dir: "{{ playbook_dir }}/../environments/prod"
+env_file: "{{ prod_dir }}/.env"
+tz: Europe/Paris
+
+# KEYCLOAK OIDC
+keycloak_issuer: https://keycloak.timox.org/realms/portal
+keycloak_host_backend_url: "http://localhost:8080"
+keycloak_admin: admin
+keycloak_db_name: keycloak
+keycloak_db_user: keycloak
+keycloak_hostname: "keycloak.{{ domain }}"
+keycloak_proxy_mode: edge
+keycloak_hostname_strict: false
+keycloak_http_enabled: true
+keycloak_http_port: 8080
+keycloak_import_realm: false
+
+# Derived Keycloak variables (computed from keycloak_issuer)
+# These are set in prerequisites.yml as facts
+# keycloak_host, keycloak_realm, keycloak_url, keycloak_backend_url
+
+# VERSIONS DOCKER
+nginx_version: "1.27-alpine"
+redis_version: "7.4-alpine"
+postgres_version: "15.10-alpine"
+guacamole_version: "1.6.0"
+oauth2_proxy_version: "v7.6.0"
+linshare_version: "6.0"
+oidcwarden_version: "latest"
+headscale_version: "0.27.1"
+bookstack_version: "24.10.1"
+keycloak_version: "26.0.7"
+headplane_version: "latest"
+
+# OAUTH2-PROXY
+oidc_client_id: oauth2-proxy
+tls_cert_file: "/data/certs/wildcard.{{ domain }}.crt"
+tls_key_file: "/data/certs/wildcard.{{ domain }}.key"
+oauth2_proxy_http_port: 4180
+oauth2_proxy_https_port: 44180
+oauth2_proxy_metrics_port: 9090
+nginx_http_port: 80
+nginx_https_port: 443
+
+# GUACAMOLE
+guacamole_oidc_client_id: guacamole
+guacamole_allowed_group: ""
+guacamole_http_port: 8081
+postgres_data_uid: 70
+postgres_data_gid: 70
+
+# Guacamole secrets mapping from vault
+guacamole_db_password: "{{ vault_guacamole_db_password }}"
+guacamole_admin_password: "{{ vault_guacamole_admin_password }}"
+
+# LINSHARE
+linshare_oidc_client_id: linshare
+linshare_admin_email: "admin@{{ domain }}"
+linshare_max_file_size: 104857600
+linshare_quota_default: 10737418240
+linshare_user_port: 8082
+linshare_admin_port: 8083
+postgres_host: linshare-db
+postgres_port: 5432
+postgres_database: linshare
+postgres_user: linshare
+mongodb_host: linshare-mongodb
+mongodb_port: 27017
+mongodb_database: linshare
+mongodb_user: linshare
+mongodb_auth_source: linshare
+clamav_host: linshare-antivirus
+clamav_port: 3310
+thumbnail_host: linshare-thumbnail
+thumbnail_port: 8080
+linshare_smtp_host: "smtp.{{ domain }}"
+linshare_smtp_port: 587
+linshare_smtp_user: ""
+linshare_smtp_password: ""
+linshare_smtp_from: "noreply@{{ domain }}"
+smtp_tls: true
+smtp_auth: true
+
+# VAULTWARDEN / OIDCWARDEN
+vaultwarden_port: 8222
+vaultwarden_signups_allowed: false
+vaultwarden_invitations_allowed: true
+oidcwarden_client_id: vaultwarden
+oidcwarden_sso_only: false
+oidcwarden_roles_enabled: true
+oidcwarden_roles_token_path: /resource_access/vaultwarden/roles
+oidcwarden_orgs_enabled: true
+oidcwarden_orgs_revocation: true
+oidcwarden_orgs_token_path: /groups
+
+# HEADSCALE
+headscale_https_port: 9443
+headscale_metrics_port: 9091
+headplane_port: 3000
+headscale_ui_port: 8000
+
+# BOOKSTACK
+bookstack_app_url: "https://wiki.{{ domain }}"
+bookstack_db_host: "mariadb.{{ domain }}"
+bookstack_db_port: 3306
+bookstack_db_user: bookstack
+bookstack_db_database: bookstack
+bookstack_config_path: /data/bookstack_config
+bookstack_session_driver: redis
+bookstack_port: 6875
+puid: 1001
+pgid: 1001
+
+# CREDENTIALS-API
+credentials_expiry_hours: 8
+
+# PORTAIL DYNAMIQUE
+keycloak_service_client_id: portal-api
+keycloak_realms: portal
+
+# GROUPES KEYCLOAK
+admin_group: admin-infra
+admin_app_group: admin-app
+user_group: utilisateurs
+
+# SERVICES A DEPLOYER
+deploy_oauth2_proxy: true
+deploy_guacamole: true
+deploy_credentials_api: true
+deploy_linshare: false
+deploy_headscale: true
+deploy_bookstack: false
+deploy_vaultwarden: true
+
+# HOSTNAMES (vides = defaut <service>.domain)
+portal_hostname: ""
+guacamole_hostname: ""
+vaultwarden_hostname: ""
+linshare_hostname: ""
+linshare_admin_hostname: ""
+headscale_hostname: ""
+bookstack_hostname: ""
+keycloak_proxy_hostname: ""
+
+# DOCKER
+compose_parallel_limit: 4

@@ -1,0 +1,45 @@
+# =============================================================================
+# Groupes de securite (style AD)
+# =============================================================================
+
+# Groupe admin-infra (administrateurs infrastructure)
+dn: cn=admin-infra,ou=groups,dc=poc,dc=local
+objectClass: groupOfNames
+cn: admin-infra
+description: Administrateurs infrastructure - acces complet
+member: uid=admin.infra,ou=users,dc=poc,dc=local
+
+# Groupe admin-app (administrateurs applicatifs)
+dn: cn=admin-app,ou=groups,dc=poc,dc=local
+objectClass: groupOfNames
+cn: admin-app
+description: Administrateurs applicatifs - monitoring et services
+member: uid=admin.app,ou=users,dc=poc,dc=local
+member: uid=user.multi,ou=users,dc=poc,dc=local
+
+# Groupe utilisateurs (utilisateurs standards)
+dn: cn=utilisateurs,ou=groups,dc=poc,dc=local
+objectClass: groupOfNames
+cn: utilisateurs
+description: Utilisateurs standards - acces services metier
+member: uid=user.test,ou=users,dc=poc,dc=local
+member: uid=user.multi,ou=users,dc=poc,dc=local
+
+# Groupe guacamole-users (acces bastion)
+dn: cn=guacamole-users,ou=groups,dc=poc,dc=local
+objectClass: groupOfNames
+cn: guacamole-users
+description: Utilisateurs autorises sur Guacamole
+member: uid=admin.infra,ou=users,dc=poc,dc=local
+member: uid=admin.app,ou=users,dc=poc,dc=local
+member: uid=user.test,ou=users,dc=poc,dc=local
+member: uid=user.multi,ou=users,dc=poc,dc=local
+
+# Groupe linshare-users (acces partage fichiers)
+dn: cn=linshare-users,ou=groups,dc=poc,dc=local
+objectClass: groupOfNames
+cn: linshare-users
+description: Utilisateurs LinShare
+member: uid=admin.infra,ou=users,dc=poc,dc=local
+member: uid=user.test,ou=users,dc=poc,dc=local
+member: uid=user.multi,ou=users,dc=poc,dc=local

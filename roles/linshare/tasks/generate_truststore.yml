@@ -1,0 +1,77 @@
+---
+# =============================================================================
+# LinShare - Generate Java Truststore for OIDC HTTPS
+# =============================================================================
+# LinShare backend requires a Java truststore with the Keycloak certificate
+# to establish HTTPS connections for OIDC. This task uses docker run with
+# eclipse-temurin:17-jre-jammy to import the wildcard certificate.
+
+- name: Ensure LinShare certs directory exists
+  ansible.builtin.file:
+    path: "{{ linshare_certs_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Check if truststore already exists
+  ansible.builtin.stat:
+    path: "{{ linshare_certs_dir }}/cacerts"
+  register: truststore_stat
+
+- name: Remove truststore if it's a directory
+  ansible.builtin.file:
+    path: "{{ linshare_certs_dir }}/cacerts"
+    state: absent
+  when:
+    - truststore_stat.stat.exists
+    - truststore_stat.stat.isdir is defined
+    - truststore_stat.stat.isdir
+
+- name: Check for wildcard certificate
+  ansible.builtin.stat:
+    path: "{{ data_dir }}/certs/wildcard.{{ domain }}.crt"
+  register: wildcard_cert_stat
+
+- name: Generate Java truststore with wildcard certificate
+  when:
+    - not truststore_stat.stat.exists or truststore_stat.stat.isdir
+    - wildcard_cert_stat.stat.exists
+  block:
+    - name: Copy base truststore from Keycloak container
+      ansible.builtin.shell: |
+        set -euo pipefail
+        docker cp keycloak:/etc/pki/ca-trust/extracted/java/cacerts {{ linshare_certs_dir }}/cacerts
+      args:
+        executable: /bin/bash
+      register: copy_truststore_result
+      changed_when: copy_truststore_result.rc == 0
+      failed_when: false
+
+    - name: Set truststore permissions for import
+      ansible.builtin.file:
+        path: "{{ linshare_certs_dir }}/cacerts"
+        mode: '0666'
+      when: copy_truststore_result.rc == 0
+
+    - name: Import wildcard certificate into truststore
+      ansible.builtin.command: >
+        docker run --rm
+        -v {{ linshare_certs_dir }}/cacerts:/tmp/cacerts
+        -v {{ data_dir }}/certs/wildcard.{{ domain }}.crt:/tmp/wildcard.crt:ro
+        eclipse-temurin:17-jre-jammy
+        keytool -import -trustcacerts -alias wildcard-{{ domain | replace('.', '-') }}
+        -file /tmp/wildcard.crt -keystore /tmp/cacerts
+        -storepass changeit -noprompt
+      register: keytool_result
+      changed_when: "'Certificate was added to keystore' in keytool_result.stdout or keytool_result.rc == 0"
+      failed_when:
+        - keytool_result.rc != 0
+        - "'already exists' not in keytool_result.stderr"
+      when: copy_truststore_result.rc == 0
+
+    - name: Set final truststore permissions
+      ansible.builtin.file:
+        path: "{{ linshare_certs_dir }}/cacerts"
+        mode: '0644'
+      when: copy_truststore_result.rc == 0

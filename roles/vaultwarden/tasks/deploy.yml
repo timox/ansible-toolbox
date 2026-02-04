@@ -1,0 +1,30 @@
+---
+- name: Validate vaultwarden state variable
+  ansible.builtin.assert:
+    that:
+      - vaultwarden_state in ['present', 'absent']
+    fail_msg: "vaultwarden_state must be 'present' or 'absent'"
+
+- name: Deploy Vaultwarden via Docker Compose
+  community.docker.docker_compose_v2:
+    project_src: "{{ prod_dir }}/vaultwarden"
+    project_name: "{{ vaultwarden_project_name }}"
+    env_files:
+      - "{{ env_file }}"
+    state: "{{ vaultwarden_state }}"
+  register: vaultwarden_deploy
+
+- name: Wait for Vaultwarden to be healthy
+  ansible.builtin.uri:
+    url: "http://localhost:{{ vaultwarden_port }}/alive"
+    status_code: 200
+  register: vaultwarden_health
+  until: vaultwarden_health.status == 200
+  retries: 30
+  delay: 10
+  when: vaultwarden_state == 'present'
+  changed_when: false
+
+- name: Display Vaultwarden deployment status
+  ansible.builtin.debug:
+    msg: "Vaultwarden is {{ 'deployed and healthy' if vaultwarden_state == 'present' else 'removed' }}"

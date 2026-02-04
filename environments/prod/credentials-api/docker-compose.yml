@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  credentials-api:
+    build: .
+    container_name: credentials-api
+    restart: unless-stopped
+    environment:
+      - DB_HOST=guacamole-postgres
+      - DB_PORT=5432
+      - DB_NAME=guacamole_db
+      - DB_USER=guacamole_user
+      - DB_PASS=${GUACAMOLE_DB_PASSWORD:-touktouk}
+      - ENCRYPTION_KEY=${CREDENTIALS_ENCRYPTION_KEY:-ChangezCetteCleEnProduction32ch}
+      - CREDENTIALS_EXPIRY_HOURS=${CREDENTIALS_EXPIRY_HOURS:-8}
+      # Keycloak API pour liste des apps
+      - KEYCLOAK_URL=${KEYCLOAK_URL:-}
+      - KEYCLOAK_AUTH_REALM=${KEYCLOAK_AUTH_REALM:-master}
+      - KEYCLOAK_REALMS=${KEYCLOAK_REALMS:-oidc}
+      - KEYCLOAK_SERVICE_CLIENT_ID=${KEYCLOAK_SERVICE_CLIENT_ID:-portal-api}
+      - KEYCLOAK_SERVICE_CLIENT_SECRET=${KEYCLOAK_SERVICE_CLIENT_SECRET:-}
+    networks:
+      - portal-net
+      - guacamole-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  portal-net:
+    external: true
+  guacamole-net:
+    external: true

@@ -1,0 +1,90 @@
+{
+  // Headscale ACL Policy (v0.27+)
+  // Documentation: https://headscale.net/ref/acls/
+  //
+  // LIMITATION: Les groupes OIDC Keycloak ne sont PAS utilisables dans les ACLs.
+  // Ils servent uniquement au filtrage login (allowed_groups dans config.yaml).
+  // Les groupes ACL doivent etre definis manuellement avec des users "user@".
+  // Ref: https://github.com/juanfont/headscale/issues/2366
+
+  // Groupes ACL manuels (ajouter les users au format "username@")
+  // En attendant le support OIDC groups -> ACL groups
+  "groups": {
+    "group:admin-infra": ["admin-infra@"],
+    "group:admin-app": ["admin-std@"]
+  },
+
+  // Tag Owners - Qui peut assigner quels tags
+  "tagOwners": {
+    "tag:subnet-router": ["group:admin-infra"],
+    "tag:exit-node": ["group:admin-infra"],
+    "tag:server": ["group:admin-infra"],
+    "tag:client": ["group:admin-infra", "group:admin-app"]
+  },
+
+  // Hosts - Machines et Reseaux
+  "hosts": {
+    "vlan-auth": "10.0.1.0/24",
+    "vlan-monitoring": "10.0.2.0/24",
+    "vlan-apps": "10.0.3.0/24",
+    "vlan-infra": "10.0.4.0/24",
+    "vlan-dmz": "10.0.0.0/24"
+  },
+
+  // ACLs - Regles d'Acces
+  "acls": [
+    // admin-infra : Acces total
+    {
+      "action": "accept",
+      "src": ["group:admin-infra"],
+      "dst": ["*:*"]
+    },
+
+    // admin-app : Acces monitoring + services admin
+    {
+      "action": "accept",
+      "src": ["group:admin-app"],
+      "dst": ["vlan-monitoring:*", "vlan-apps:*"]
+    },
+
+    // Tous les membres authentifies peuvent acceder a leurs propres machines
+    {
+      "action": "accept",
+      "src": ["autogroup:member"],
+      "dst": ["autogroup:self:*"]
+    },
+
+    // SUBNET ROUTERS : Acces VLANs
+    {
+      "action": "accept",
+      "src": ["tag:subnet-router"],
+      "dst": ["*:*"]
+    }
+  ],
+
+  // SSH Rules (autogroup:self supported since headscale >= 0.27)
+  "ssh": [
+    {
+      "action": "accept",
+      "src": ["group:admin-infra"],
+      "dst": ["autogroup:self"],
+      "users": ["root", "autogroup:nonroot"]
+    },
+    {
+      "action": "accept",
+      "src": ["group:admin-app"],
+      "dst": ["tag:server"],
+      "users": ["autogroup:nonroot"]
+    }
+  ],
+
+  // Auto Approvers
+  "autoApprovers": {
+    "routes": {
+      "10.0.0.0/8": ["group:admin-infra"],
+      "172.16.0.0/12": ["group:admin-infra"],
+      "192.168.0.0/16": ["group:admin-infra"]
+    },
+    "exitNode": ["group:admin-infra"]
+  }
+}

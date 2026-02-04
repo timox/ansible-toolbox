@@ -1,0 +1,18 @@
+---
+# =============================================================================
+# Directory creation - Equivalent deploy.sh lines 1294-1305
+# =============================================================================
+
+- name: Create data directories under {{ data_dir }}
+  ansible.builtin.file:
+    path: "{{ data_dir }}/{{ item }}"
+    state: directory
+    mode: "0755"
+  loop: "{{ data_directories }}"
+
+- name: Create local directories (relative to prod_dir)
+  ansible.builtin.file:
+    path: "{{ prod_dir }}/{{ item }}"
+    state: directory
+    mode: "0755"
+  loop: "{{ local_directories }}"

@@ -1,0 +1,81 @@
+---
+# =============================================================================
+# Generate Headscale API Key for Headplane
+# =============================================================================
+# This API key allows Headplane to communicate with Headscale API
+# Only generates if vault_headscale_api_key is empty or undefined
+
+- name: Check if Headscale API key already exists in vault
+  ansible.builtin.set_fact:
+    headscale_api_key_exists: "{{ vault_headscale_api_key is defined and vault_headscale_api_key != '' }}"
+
+- name: Display API key status
+  ansible.builtin.debug:
+    msg: "Headscale API key already configured, skipping generation"
+  when: headscale_api_key_exists
+
+- name: Generate new API key if not exists
+  when:
+    - not headscale_api_key_exists
+    - not ansible_check_mode
+  block:
+    - name: Wait for Headscale to be ready for API key generation
+      ansible.builtin.command: docker exec headscale headscale apikeys list
+      register: headscale_ready
+      changed_when: false
+      failed_when: false
+      retries: 30
+      delay: 2
+      until: headscale_ready.rc == 0
+
+    - name: Create Headscale API key
+      ansible.builtin.command: >-
+        docker exec headscale headscale apikeys create
+        --expiration {{ headscale_api_key_expiration }}
+      register: api_key_result
+      changed_when: api_key_result.rc == 0
+      failed_when: api_key_result.rc != 0
+      no_log: true
+
+    - name: Extract API key from output
+      ansible.builtin.set_fact:
+        generated_api_key: "{{ api_key_result.stdout | trim }}"
+      no_log: true
+      when: api_key_result.rc == 0
+
+    - name: Update vault_headscale_api_key in .env file
+      ansible.builtin.lineinfile:
+        path: "{{ env_file }}"
+        regexp: '^HEADSCALE_API_KEY=.*'
+        line: "HEADSCALE_API_KEY={{ generated_api_key }}"
+        backup: true
+      no_log: true
+      when: api_key_result.rc == 0
+
+    - name: Set API key as fact for subsequent tasks
+      ansible.builtin.set_fact:
+        vault_headscale_api_key: "{{ generated_api_key }}"
+      no_log: true
+      when: api_key_result.rc == 0
+
+    - name: Regenerate headplane.yaml with new API key
+      ansible.builtin.template:
+        src: headplane.yaml.j2
+        dest: "{{ headscale_config_dir }}/headplane.yaml"
+        mode: '0644'
+      vars:
+        headscale_hostname_resolved: "{{ headscale_hostname | default('vpn.' + domain, true) }}"
+      no_log: true
+      when: api_key_result.rc == 0
+
+    - name: Restart Headplane container with new API key
+      ansible.builtin.command: docker restart headplane
+      register: headplane_restart
+      changed_when: headplane_restart.rc == 0
+      failed_when: false
+      when: api_key_result.rc == 0
+
+    - name: Display success message
+      ansible.builtin.debug:
+        msg: "Headscale API key generated and configured successfully"
+      when: api_key_result.rc == 0

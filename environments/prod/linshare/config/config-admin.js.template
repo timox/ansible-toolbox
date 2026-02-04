@@ -1,0 +1,11 @@
+window.APP_CONFIGURATION = Object.freeze({
+  beta: true,
+  legacyAppUrl: '/',
+  oidcEnabled: true,
+  oidcSetting: {
+    authority: '${KEYCLOAK_ISSUER}',
+    client_id: '${LINSHARE_OIDC_CLIENT_ID}',
+    client_secret: '${LINSHARE_OIDC_CLIENT_SECRET}',
+    scope: 'openid email profile',
+  },
+});

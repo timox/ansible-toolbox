@@ -1,0 +1,197 @@
+# =============================================================================
+# EXEMPLE : Application sur hôte distant
+# =============================================================================
+# Ce fichier montre comment configurer nginx-apps pour proxy vers une
+# application déployée sur un autre serveur (pas dans Docker local).
+#
+# ARCHITECTURE :
+#
+#   ┌─────────────────────┐         ┌─────────────────────┐
+#   │   HÔTE PRINCIPAL    │  Réseau │    HÔTE DISTANT     │
+#   │                     │ Physique│                     │
+#   │  nginx-apps ────────┼────────►│  app-backend:8080   │
+#   │  oauth2-proxy       │(Firewall)│                     │
+#   └─────────────────────┘         └─────────────────────┘
+#
+# USAGE :
+#   1. Copier ce fichier en template :
+#      cp remote-app.conf.example glpi.conf.template
+#
+#   2. Adapter le template (server_name, proxy_pass, variables)
+#
+#   3. Ajouter les variables dans .env :
+#      GLPI_BACKEND_HOST=192.168.10.50
+#      GLPI_BACKEND_PORT=8080
+#
+#   4. Relancer deploy.sh :
+#      ./deploy.sh --service oauth2-proxy
+#      # Le fichier glpi.conf sera généré dans nginx/conf.d/
+#
+#   5. Vérifier :
+#      docker exec nginx-apps nginx -t
+#      docker restart nginx-apps
+#
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# GLPI - Exemple application distante avec auth_request
+# -----------------------------------------------------------------------------
+# Backend: http://192.168.10.50:8080 (ou glpi.internal:8080)
+# Mode auth: oauth2-proxy (headers X-Forwarded-*)
+# -----------------------------------------------------------------------------
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name glpi.${DOMAIN};
+
+    ssl_certificate /certs/wildcard.${DOMAIN}.crt;
+    ssl_certificate_key /certs/wildcard.${DOMAIN}.key;
+
+    # Authentification obligatoire via oauth2-proxy
+    auth_request /oauth2/auth;
+    error_page 401 = /oauth2/sign_in;
+
+    # Récupérer les infos utilisateur depuis oauth2-proxy
+    auth_request_set $auth_user $upstream_http_x_auth_request_user;
+    auth_request_set $auth_email $upstream_http_x_auth_request_email;
+    auth_request_set $auth_groups $upstream_http_x_auth_request_groups;
+    auth_request_set $auth_preferred_username $upstream_http_x_auth_request_preferred_username;
+
+    # Restriction par groupe (optionnel)
+    # set $authorized 0;
+    # if ($auth_groups ~ "admin-") {
+    #     set $authorized 1;
+    # }
+    # if ($authorized = 0) {
+    #     return 403 "Access forbidden - Admin group required";
+    # }
+
+    location / {
+        # Backend distant - utiliser IP ou DNS interne
+        # PAS un nom de container Docker (pas sur le même hôte)
+        proxy_pass http://${GLPI_BACKEND_HOST}:${GLPI_BACKEND_PORT};
+
+        # Headers standard
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Headers SSO - l'application distante peut utiliser ces headers
+        # pour identifier l'utilisateur authentifié
+        proxy_set_header X-Forwarded-User $auth_user;
+        proxy_set_header X-Forwarded-Email $auth_email;
+        proxy_set_header X-Forwarded-Groups $auth_groups;
+        proxy_set_header X-Forwarded-Preferred-Username $auth_preferred_username;
+
+        # REMOTE_USER pour compatibilité applications legacy
+        proxy_set_header REMOTE_USER $auth_email;
+
+        # Timeouts pour applications lentes
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+
+    # Endpoint oauth2-proxy (toujours local)
+    location /oauth2/ {
+        proxy_pass http://oauth2-proxy:4180;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location = /oauth2/auth {
+        internal;
+        proxy_pass http://oauth2-proxy:4180/oauth2/auth;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        # Pas de body pour auth_request
+        proxy_pass_request_body off;
+        proxy_set_header Content-Length "";
+    }
+}
+
+# -----------------------------------------------------------------------------
+# ZABBIX - Exemple avec restriction groupe admin
+# -----------------------------------------------------------------------------
+# Backend: http://zabbix.internal:8080
+# Mode auth: oauth2-proxy + restriction admin-*
+# -----------------------------------------------------------------------------
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name zabbix.${DOMAIN};
+
+    ssl_certificate /certs/wildcard.${DOMAIN}.crt;
+    ssl_certificate_key /certs/wildcard.${DOMAIN}.key;
+
+    auth_request /oauth2/auth;
+    error_page 401 = /oauth2/sign_in;
+
+    auth_request_set $auth_user $upstream_http_x_auth_request_user;
+    auth_request_set $auth_email $upstream_http_x_auth_request_email;
+    auth_request_set $auth_groups $upstream_http_x_auth_request_groups;
+
+    # Restriction: uniquement groupes admin-*
+    set $authorized 0;
+    if ($auth_groups ~ "admin-infra") {
+        set $authorized 1;
+    }
+    if ($auth_groups ~ "admin-standard") {
+        set $authorized 1;
+    }
+    if ($authorized = 0) {
+        return 403 "Access forbidden - Admin group required";
+    }
+
+    location / {
+        proxy_pass http://${ZABBIX_BACKEND_HOST}:${ZABBIX_BACKEND_PORT};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-User $auth_email;
+        proxy_set_header X-Forwarded-Groups $auth_groups;
+    }
+
+    location /oauth2/ {
+        proxy_pass http://oauth2-proxy:4180;
+        proxy_set_header Host $host;
+    }
+
+    location = /oauth2/auth {
+        internal;
+        proxy_pass http://oauth2-proxy:4180/oauth2/auth;
+        proxy_set_header Host $host;
+        proxy_pass_request_body off;
+        proxy_set_header Content-Length "";
+    }
+}
+
+# -----------------------------------------------------------------------------
+# Variables .env requises
+# -----------------------------------------------------------------------------
+# Ajouter dans environments/prod/.env :
+#
+# # GLPI (hôte distant)
+# GLPI_BACKEND_HOST=192.168.10.50
+# GLPI_BACKEND_PORT=8080
+#
+# # Zabbix (hôte distant)
+# ZABBIX_BACKEND_HOST=zabbix.internal
+# ZABBIX_BACKEND_PORT=8080
+#
+# -----------------------------------------------------------------------------
+# Règles firewall requises
+# -----------------------------------------------------------------------------
+# Source: VLAN-A (hôte nginx-apps)
+# Destination: VLAN où se trouve l'app distante
+# Port: TCP/8080 (ou le port de l'app)
+# Action: ALLOW
+# -----------------------------------------------------------------------------

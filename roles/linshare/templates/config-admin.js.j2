@@ -1,0 +1,11 @@
+window.APP_CONFIGURATION = Object.freeze({
+  beta: true,
+  legacyAppUrl: '/',
+  oidcEnabled: true,
+  oidcSetting: {
+    authority: '{{ keycloak_issuer }}',
+    client_id: '{{ linshare_oidc_client_id }}',
+    client_secret: '{{ vault_linshare_oidc_client_secret }}',
+    scope: 'openid email profile',
+  },
+});

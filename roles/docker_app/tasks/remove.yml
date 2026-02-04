@@ -1,0 +1,26 @@
+---
+# =============================================================================
+# DOCKER_APP - Removal Tasks
+# =============================================================================
+
+- name: Stop services via Docker Compose for {{ docker_app_name }}
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_app_compose_dir }}"
+    project_name: "{{ docker_app_compose_project }}"
+    files: "{{ docker_app_compose_files }}"
+    state: absent
+  register: _docker_app_remove_result
+  changed_when: _docker_app_remove_result.actions | length > 0
+
+- name: Remove generated config files for {{ docker_app_name }}
+  ansible.builtin.file:
+    path: "{{ item.dest }}"
+    state: absent
+  loop: "{{ docker_app_templates }}"
+  loop_control:
+    label: "{{ item.dest | basename }}"
+  when: docker_app_remove_configs | bool
+
+- name: Display removal status for {{ docker_app_name }}
+  ansible.builtin.debug:
+    msg: "{{ docker_app_name }} services stopped and configs removed"

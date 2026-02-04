@@ -21,6 +21,13 @@ semaphore/.env
 .vscode/
 .idea/
 
+# Environments (generated configs)
+environments/prod/.env
+environments/prod/*/config/*.properties
+environments/prod/*/config/*.yaml
+environments/prod/*/config/*.js
+environments/prod/*/config/*.cfg
+
 # OS
 .DS_Store
 Thumbs.db

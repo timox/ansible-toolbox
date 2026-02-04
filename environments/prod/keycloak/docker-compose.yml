@@ -1,0 +1,79 @@
+# =============================================================================
+# KEYCLOAK AUTONOME - Docker Compose
+# =============================================================================
+# Utilise le .env centralise de environments/prod/.env
+#
+# Usage:
+#   docker compose --env-file ../.env -f docker-compose.yml up -d
+#   docker compose --env-file ../.env -f docker-compose.yml down
+# =============================================================================
+
+services:
+  keycloak-db:
+    image: postgres:${POSTGRES_VERSION:-15.10-alpine}
+    container_name: keycloak-db
+    env_file:
+      - path: ../.env
+        required: false
+    environment:
+      POSTGRES_DB: ${KEYCLOAK_DB_NAME:-keycloak}
+      POSTGRES_USER: ${KEYCLOAK_DB_USER:-keycloak}
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-change-me-keycloak-db}
+    volumes:
+      - keycloak-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${KEYCLOAK_DB_USER:-keycloak}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - keycloak-net
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:${KEYCLOAK_VERSION:-26.0.7}
+    container_name: keycloak
+    env_file:
+      - path: ../.env
+        required: false
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-change-me-keycloak-admin}
+      KC_DB: postgres
+      KC_DB_URL_HOST: keycloak-db
+      KC_DB_URL_PORT: 5432
+      KC_DB_URL_DATABASE: ${KEYCLOAK_DB_NAME:-keycloak}
+      KC_DB_USERNAME: ${KEYCLOAK_DB_USER:-keycloak}
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-change-me-keycloak-db}
+      KC_PROXY_HEADERS: xforwarded
+      KC_PROXY_TRUSTED_ADDRESSES: 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+      # Hostname v2 (Keycloak 25+) - URL complète, remplace hostname-url/strict/strict-https
+      KC_HOSTNAME: https://${KEYCLOAK_HOSTNAME:-keycloak.poc.local}
+      KC_HTTP_ENABLED: "true"
+      KC_HTTP_PORT: 8080
+      # HTTPS natif avec certificats
+      KC_HTTPS_CERTIFICATE_FILE: /opt/keycloak/certs/tls.crt
+      KC_HTTPS_CERTIFICATE_KEY_FILE: /opt/keycloak/certs/tls.key
+      KC_HTTPS_PORT: 8443
+    # Note: Keycloak 26.x utilise une image UBI minimal sans shell
+    # Pour importer un realm, utiliser: command: ["start", "--import-realm"]
+    command: start
+    ports:
+      - "${KEYCLOAK_HTTP_PORT:-8080}:8080"
+      - "8443:8443"
+    volumes:
+      - keycloak-data:/opt/keycloak/data
+      - ./realm-federation:/opt/keycloak/data/import:ro
+      - /data/certs:/opt/keycloak/certs:ro
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    networks:
+      - keycloak-net
+
+volumes:
+  keycloak-db-data:
+  keycloak-data:
+
+networks:
+  keycloak-net:
+    external: true

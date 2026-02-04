@@ -1,0 +1,8 @@
+---
+# =============================================================================
+# CREDENTIALS API ROLE - Defaults
+# =============================================================================
+# User-configurable defaults for Credentials API deployment
+
+credentials_api_state: present
+credentials_api_project_name: credentials-api

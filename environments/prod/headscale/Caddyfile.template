@@ -1,0 +1,48 @@
+# Caddyfile - Reverse Proxy for Headscale + Headplane
+# Routes /admin to Headplane UI, everything else to Headscale API
+
+{
+    # Global options
+    admin off
+    auto_https off
+}
+
+# HTTPS server using provided certificates
+:443 {
+    # Use wildcard certificate from /certs
+    tls /certs/wildcard.${DOMAIN}.crt /certs/wildcard.${DOMAIN}.key
+
+    # Logging
+    log {
+        output stdout
+        format console
+    }
+
+    # Headplane Web UI on /admin path
+    handle /admin* {
+        reverse_proxy headplane:3000
+    }
+
+    # OIDC callback for Headplane
+    handle /admin/oidc/* {
+        reverse_proxy headplane:3000
+    }
+
+    # Headscale API and control plane
+    handle {
+        reverse_proxy headscale:8080
+    }
+}
+
+# HTTP redirect to HTTPS and health check
+:80 {
+    # Health check endpoint for Docker healthcheck
+    handle /health {
+        respond "OK" 200
+    }
+
+    # Redirect all other requests to HTTPS
+    handle {
+        redir https://{host}{uri} permanent
+    }
+}

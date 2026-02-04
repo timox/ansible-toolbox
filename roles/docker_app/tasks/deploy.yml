@@ -1,0 +1,20 @@
+---
+# =============================================================================
+# DOCKER_APP - Docker Compose Deployment
+# =============================================================================
+
+- name: Deploy via Docker Compose for {{ docker_app_name }}
+  community.docker.docker_compose_v2:
+    project_src: "{{ docker_app_compose_dir }}"
+    project_name: "{{ docker_app_compose_project }}"
+    files: "{{ docker_app_compose_files }}"
+    env_files: "{{ docker_app_env_files if docker_app_env_files | length > 0 else omit }}"
+    profiles: "{{ docker_app_compose_profiles if docker_app_compose_profiles | length > 0 else omit }}"
+    state: present
+  register: docker_app_deploy_result
+  changed_when: docker_app_deploy_result.actions | length > 0
+
+- name: Display deployment result for {{ docker_app_name }}
+  ansible.builtin.debug:
+    msg: "{{ docker_app_name }} deployed ({{ docker_app_deploy_result.actions | length }} actions)"
+  when: docker_app_deploy_result.actions | length > 0

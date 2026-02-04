@@ -1,0 +1,21 @@
+---
+# =============================================================================
+# GUACAMOLE - Removal Tasks
+# =============================================================================
+
+- name: Stop Guacamole services via Docker Compose
+  community.docker.docker_compose_v2:
+    project_src: "{{ prod_dir }}/guacamole"
+    project_name: "{{ guacamole_compose_project }}"
+    state: absent
+  register: guacamole_remove
+  changed_when: guacamole_remove.actions | length > 0
+
+- name: Remove guacamole.properties configuration file
+  ansible.builtin.file:
+    path: "{{ guacamole_properties_path }}"
+    state: absent
+
+- name: Display removal status
+  ansible.builtin.debug:
+    msg: "Guacamole services stopped and configuration removed"

@@ -1,0 +1,341 @@
+# In order to use an external configuration file for linshare, use this key for JAVA_OPS
+# JAVA_OPTS="${JAVA_OPTS} -Djava.awt.headless=true -Xms512m -Xmx2048m"
+# JAVA_OPTS="${JAVA_OPTS} -Dlinshare.config.path=file:/etc/linshare/"
+# JAVA_OPTS="${JAVA_OPTS} -Dlog4j2.configurationFile=file:/etc/linshare/log4j2.properties"
+# JAVA_OPTS="${JAVA_OPTS} -Dspring.profiles.active=default,jcloud,batches"
+# On Centos, use only one JAVA_OPTS statement. Do not use the previous syntax, it may not work.
+
+# If you want to change the location of tmp directory you need to override the default directory used by Tomcat9 which is `/tmp`, by editing `/etc/default/tomcat9` and add:
+# CATALINA_TMPDIR=/your/path/tmp
+
+# Or you can use environment variable : SPRING_PROFILES_ACTIVE or -Dspring.profiles.active property
+# to configure which profile you want to use.
+# You must enable at least one authentication profile among authentication profiles,
+
+
+# Available authentication profiles :
+#	* default : default authentication process.
+#	* sso : Enable headers injection for SSO. This profile includes default profile capabilities
+
+# Available file data store profiles :
+#	* jcloud : Using jcloud as file data store : Amazon S3, Swift, Ceph, filesystem.
+#	* gridfs : Using gridfs (mongodb) as file data store.
+#	* migration-gridfs-to-jcloud : Using jcloud as primary file data store and using gridfs (mongodb) as secondary file data store.
+#	Recommended profile for production is jcloud with Swift.
+
+#	For migration-* profiles:
+#		* files are retrieved from primary, then if not found , they are retrieved from secondary.
+#		* files are removed from primary and secondary
+#		* new files are removed only added to the primary
+
+
+# Additional profiles :
+#	* batches : if this profile is enable (by default it should be), it will enable all Quartz jobs (cron tasks).
+
+#******************** MAIL CONFIGURATION TO SEND MAIL INFORMATION TO USER
+
+mail.smtp.host=${SMTP_HOST}
+mail.smtp.port=${SMTP_PORT}
+# use 25  default port for plain text mode
+# use 587 default port if you use starttls mode
+# use 465 default port if you use ssl mode
+mail.smtp.user=${SMTP_USER}
+mail.smtp.password=${SMTP_PASSWORD}
+mail.smtp.auth.needed=${SMTP_AUTH_ENABLE}
+mail.smtp.charset=UTF-8
+# StartTls mode (Set to true to enable it)
+mail.smtp.starttls.enable=${SMTP_START_TLS_ENABLE}
+# Needed when starttls is true, default value "TLSv1.3 TLSv1.2", different versions should be separated by an empty character.
+# In case of failure, you can add "-Djavax.net.debug=all" in the JAVA_OPTS variable in order to have communication logs between Linshare and the SMTP server.
+# One common error with TLSv1.3 (javax.net.ssl.SSLHandshakeException: Received fatal alert: handshake_failure)
+# comes from incompatible cipher suites used by the server.
+# Here is a link to the TLSv1.3 cipher suites: https://ciphersuite.info/cs/?tls=tls13
+mail.smtp.ssl.protocols=TLSv1.3 TLSv1.2
+# SSL Mode (If you enable SSL Mode it will override startTls mode)
+mail.smtp.ssl.enable=${SMTP_SSL_ENABLE}
+
+#******************** DATABASE
+### PostgreSQL
+linshare.db.username=${POSTGRES_USER}
+linshare.db.password=${POSTGRES_PASSWORD}
+linshare.db.driver.class=org.postgresql.Driver
+linshare.db.url=jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DATABASE}
+linshare.db.dialect=org.hibernate.dialect.PostgreSQLDialect
+
+#show sql command in console (true in debug mode)
+linshare.db.show_sql=false
+#format sql command in console (true in debug mode)
+linshare.db.format_sql=false
+#generate statistics with hibernate
+linshare.db.gen_stats=false
+# can be create, create-drop, update, validate, choose validate for production
+linshare.db.hbm2ddl.auto=validate
+
+# Pool
+# linshare.db.pool.maxidle=30
+# linshare.db.pool.maxactive=100
+# linshare.db.pool.maxwait=10000
+# the eviction thread runs every 30 minutes
+# linshare.db.pool.timebetweenevictionrunsmillis=180000
+
+
+#******************** GENERAL PROPERTIES
+
+######## Storage options ########
+
+
+#### Global storage options ####
+# available storage mode :
+# * filesystem : storing documents on file system for local storage.
+# * swift-keystone : storing documents into swift without region support (generic)
+#        Limitation : maximum size file size is 5GB
+# * openstack-swift : storing documents into openstack swift with region support.(regionId will be mandatory)
+#        Limitation : maximum size file size is 5GB
+# * aws-s3 : storing documents into Amazon S3.
+#        Limitation : maximum size file size is 5GB
+linshare.documents.storage.mode=${STORAGE_MODE}
+linshare.documents.storage.bucket=${STORAGE_BUCKET}
+
+# Temporary directory : local work directory to encrypt/decrypt data
+linshare.encipherment.tmp.dir=/var/lib/linshare/tmp
+
+#### File system storage options - default backend####
+linshare.documents.storage.filesystem.directory=${STORAGE_FILESYSTEM_DIR}
+
+######## Extended storage options ########
+
+#### Object storage options ####
+# deprecated property, if set user.name and user.domain will be ignored.
+linshare.documents.storage.identity=
+# NB : For OpenStack Swift, format is different
+# linshare.documents.storage.identity=tenant_name:user_name
+linshare.documents.storage.user.domain=
+linshare.documents.storage.user.name=
+linshare.documents.storage.credential=
+# LinShare supports  keystone2 and keystone3 for swift.
+linshare.documents.storage.keystone.version=2
+# Project name is required for keystone 3 (useless for keystone s2)
+linshare.documents.storage.project.name=
+# keystone endpoint, ex :
+# - https://auth.cloud.ovh.net/v2.0/
+# - https://auth.cloud.ovh.net/v3
+linshare.documents.storage.endpoint=
+# required if you are using Swift with region (openstack-swift)
+linshare.documents.storage.regionId=
+linshare.documents.storage.multipartupload=${STORAGE_MULTIPART_UPLOAD}
+#accepted values are 2 or 4; others will be ignored
+linshare.documents.storage.forceS3SignatureVersion=0
+
+#### Mongo storage options ####
+
+linshare.mongo.connect.timeout=30000
+linshare.mongo.socket.timeout=30000
+
+#### Write concern
+# MAJORITY: waits on a majority of servers for the write operation.
+# JOURNALED: Write operations wait for the server to group commit to the journal file on disk.
+# ACKNOWLEDGED: Write operations that use this write concern will wait for acknowledgement,
+#	 			using the default write concern configured on the server.
+linshare.mongo.write.concern=${MONGODB_WRITE_CONCERN}
+
+#### connection for data
+# replicaset: host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]
+linshare.mongo.data.replicaset=${MONGODB_DATA_REPLICA_SET}
+linshare.mongo.data.database=${MONGODB_DATA_DATABASE}
+# linshare.mongo.data.credentials=${MONGODB_USER}:${MONGODB_PASSWORD}@${MONGODB_AUTH_DATABASE}
+linshare.mongo.data.credentials=${MONGODB_USER}:${MONGODB_PASSWORD}@${MONGODB_AUTH_DATABASE}
+
+#### connection for small files
+# Using MongoDb to store very small files (thumbnails, mail attachments, ...)
+linshare.mongo.smallfiles.replicaset=${MONGODB_SMALLFILES_REPLICA_SET}
+linshare.mongo.smallfiles.database=${MONGODB_SMALLFILES_DATABASE}
+linshare.mongo.smallfiles.credentials=${MONGODB_USER}:${MONGODB_PASSWORD}@${MONGODB_AUTH_DATABASE}
+
+#### connection for big files. (dev mode)
+# Store all files in MongoDB GridFS. Not recommended.
+linshare.mongo.bigfiles.replicaset=${MONGODB_BIGFILES_REPLICA_SET}
+linshare.mongo.bigfiles.database=${MONGODB_BIGFILES_DATABASE}
+linshare.mongo.bigfiles.credentials=${MONGODB_USER}:${MONGODB_PASSWORD}@${MONGODB_AUTH_DATABASE}
+
+######## Storage options - end ########
+
+
+#******************** BATCH AND CRON
+# Syntax :
+# 	 Field				Mandatory	Allowed Values			Allowed Special Characters
+# 1. Second				yes			0-59					, - * /	
+# 2. Minutes			yes			0-59					, - * /
+# 3. Hours				yes			0-23					, - * /
+# 4. Day of month		yes			1-31					, - * ? / L W
+# 5. Month				yes			1-2 or JAN-DEC			, - * /
+# 6. Day of week		yes			1-7 or SUN-SAT			, - * ? / L #
+# 7. Year 				no			empty, 1970-2099		, - * /
+#
+# Legend : ? : no specific value
+#		 : L : last
+#		 : W : weekday
+#
+
+# Batches are launched every days at 0a.m
+# This cron is responsible of :
+#   - deleting expired Guest, Internal Users, favourite recipients and domains
+#   - warning owner about guest expiration
+# job.users.cron.expression=0 0 0 * * ?
+# linshare.warn.owner.about.guest.expiration.days.before=7
+
+# Batches are launched every days at 6a.m
+# This cron is responsible of :
+#   - sending a notification for undownloaded shared documents.
+#   - warning sender about expiration of shares with undownloaded documents
+# job.shares.undownloaded.notification.cron.expression=0 0 6 * * ?
+# linshare.warn.owner.about.share.expiration.days.before=7
+
+# This key is the number of days between the
+# expiration of a user and his destruction
+# job.users.delay.before.purge=7
+
+# Batches are launched every days at 0a.m
+# This cron is responsible of :
+#   - deleting expired ShareEntries
+#   - deleting expired AnonymousShareEntries
+#   - deleting expired AnonymousUrl
+#   - deleting "empty" ShareEntryGroup
+#   - deleting expired DocumentEntries if it is activated. See job.document.cleaner.activation.
+#   - deleting physically unused files (removing files from the file system, the object storage, ...)
+#     aka the File Garbage Collector.
+#   - notifying about upcoming outdated shares
+#   - notifying about upcoming outdated anonymous shares
+# job.shares.cron.expression=0 30 0 * * ?
+
+# There is a fail safe preventing to delete expired personal space documents, aka DocumentEntries.
+# Even if the functionality is enabled and the batch/job triggered, YOU MUST allowed to delete them.
+# job.document.cleaner.activation=false
+
+# Batches are launched every days at 0a.m
+# This cron is responsible of :
+#   - checking and update MIME type of Documents with check flag on
+# job.mimetype.cron.expression=0 0 0 * * ?
+
+# Fetching consistency batch is launched at 2a.m every day
+# This cron is responsible of :
+#   - deleting missing documents in jack rabbit.
+#   - detecting inconsistent users (users there are not anymore in its domain)
+#   - detecting users that are still inconsistent after being flagged as such
+# job.consistency.cron.expression=0 0 2 * * ?
+
+# Batches are launched every hour
+# This cron is responsible of :
+#   - update upload request status
+#   - close expired upload request
+#   - close expired upload request group
+#   - notify users about upload requests about to expiring
+job.uploadrequest.cron.expression=0 0 * ? * *
+
+# Batches are launched every weeks at 0a.m
+# This cron is responsible of :
+#   - update dailyStatistics and quota
+# job.updateDailyStatQuota.cron.expression= 0 0 0 * * ?
+
+# Batches are launched every 4 hours
+# This cron is responsible of :
+#   - synchronizing LdapGroups with Workgroups
+# job.ldapgroups.cron.expression=0 0 0/4 * * ?
+
+# Batches are launched every days at 4a.m
+# This cron is responsible of :
+#   - executing task populating gdpr garbage collector
+# job.gdpr.cron.expression=0 0 4 * * ?
+# linshare.gdpr.enable=false
+
+
+# webservice
+# data exceeding the memory threshold will be written to the directory (in bytes)
+webservice.attachment-memory-threshold=4000000
+webservice.attachment-directory=/tmp/
+
+
+#******************** VIRUS SCANNER
+#uncomment those properties if you want to enable clamav virus scanner feature
+virusscanner.clamav.host=${CLAMAV_HOST}
+virusscanner.clamav.port=${CLAMAV_PORT}
+# Every file which size is over than the value below (in bytes) will skip the virus scanner.
+# virusscanner.limit.filesize=50000000
+
+#******************** SSO
+# LemonLDAP::NG / SiteMinder HTTP request authenticator
+sso.header.user=Auth-User
+# comma separated list of ip address to be trusted :
+sso.header.allowfrom.enable=${SSO_IP_LIST_ENABLE}
+sso.header.allowfrom=${SSO_IP_LIST}
+
+#******** Domain
+# If true, we can search an user during authentication process using his uid or his mail (as a login).
+# By default, false, only the mail is used.
+# Be careful if you have multiples directories, login must be unique !!!
+linshare.multidomain.enable=false
+
+
+#****************** Async task management
+# ThreadPoolTaskExecutor for AsyncTask like uploads.
+# linshare.ThreadPoolTaskExecutor.corePoolSize=50
+# linshare.ThreadPoolTaskExecutor.maxPoolSize=100
+
+# enable file size validation on rest API (thread entries, documents and flow).
+linshare.rest.files.size.validation=true
+
+#mail attachment size limit
+mail.attchment.limit.size=393216
+
+#******** LinThumbnail configuration
+linshare.linthumbnail.dropwizard.server=http://${THUMBNAIL_HOST}:${THUMBNAIL_PORT}/linthumbnail?mimeType=%1$s
+# key to disable thumbnail generation
+linshare.documents.thumbnail.pdf.enable=${THUMBNAIL_ENABLE_PDF}
+linshare.documents.thumbnail.enable=${THUMBNAIL_ENABLE}
+
+# JWT support values
+# Default token validity in second : 300  (5 minutes)
+jwt.expiration=${JWT_EXPIRATION}
+# jwt.issuer=LinShare
+# Ever token (generated by LinShare or others) won't last more than 5 minutes.
+jwt.expiration=${JWT_TOKEN_MAX_LIFETIME}
+# jwt.global.key.private.path=/etc/linshare/id_rsa
+# jwt.global.key.public.path=/etc/linshare/id_rsa.pub
+
+#******** Production Mode
+linshare.mode.production=true
+
+# Minimum length of password
+# password.min.length=12
+
+# Maximum length of password
+# password.max.length=30
+
+# Minimum Number of uppercase in password
+# uppercase.character.password=1
+
+# Minimum Number of lowercase in password
+# lowercase.character.password=1
+
+# Minimum Number of digits in password
+# digits.character.password=1
+
+# Minimum Number of special characters in password
+# special.character.password=1
+
+# Maximum Number of stored passwords
+# password.history.max.number=10
+
+# Cookie value for shares without password
+# no.password.cookie.value=_
+
+## OIDC Parameters
+
+
+linshare.display.licenceTerm=true
+
+# OIDC Parameters - ACTIVATED
+oidc.on=true
+oidc.issuerUri=https://keycloak.poc.local/realms/poc
+oidc.client.id=linshare
+oidc.client.secret=S5o5q1m9udnRyF8YwNvx1NJCAwBv82ZH
+oidc.opaqueToken.lengh=2000

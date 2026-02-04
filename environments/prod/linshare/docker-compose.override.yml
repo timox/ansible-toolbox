@@ -1,0 +1,37 @@
+# Override LinShare pour POC (HTTPS via nginx reverse proxy)
+# Usage: docker compose --env-file ../.env -f docker-compose.linshare.yml -f docker-compose.override.yml up -d
+
+services:
+  # Utiliser l'image database officielle LinShare avec schema pre-initialise
+  linshare-db:
+    image: ${LINSHARE_DB_IMAGE:-linagora/linshare-database:6.5}
+    container_name: linshare-postgres
+    environment:
+      POSTGRES_USER: linshare
+      POSTGRES_PASSWORD: ${LINSHARE_DB_PASSWORD:-changeme}
+
+  linshare-backend:
+    environment:
+      # URL HTTPS via nginx reverse proxy
+      LINSHARE_URL: https://linshare.${DOMAIN}
+      # OIDC natif LinShare (auto-provisionne les utilisateurs)
+      SPRING_PROFILES_ACTIVE: default,jcloud,batches
+      # OIDC Keycloak
+      OIDC_ENABLED: "true"
+      OIDC_REDIRECT_URI: https://linshare.${DOMAIN}/#!/oidcCallback
+
+  linshare-ui-user:
+    environment:
+      EXTERNAL_URL: https://linshare.${DOMAIN}
+    # Pas de port exposé - accès uniquement via nginx reverse proxy
+    ports: !reset []
+    volumes:
+      - /data/linshare/config/config.js:/usr/local/apache2/htdocs/linshare-ui-user/config/config.js:ro
+
+  linshare-ui-admin:
+    environment:
+      EXTERNAL_URL: https://linshare-admin.${DOMAIN}
+    # Pas de port exposé - accès uniquement via nginx reverse proxy
+    ports: !reset []
+    volumes:
+      - /data/linshare/config/config-admin.js:/usr/local/apache2/htdocs/linshare-ui-admin/config/config.js:ro

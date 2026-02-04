@@ -1,0 +1,42 @@
+---
+# =============================================================================
+# Remove Headscale Deployment
+# =============================================================================
+
+- name: Stop Headscale services via Docker Compose
+  community.docker.docker_compose_v2:
+    project_src: "{{ headscale_config_dir }}"
+    files:
+      - docker-compose.yml
+    state: absent
+    profiles: "{{ headscale_compose_profiles }}"
+  register: headscale_remove
+
+- name: Remove Headscale data directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ headscale_data_dir }}"
+    - "/data/headplane"
+  when: headscale_purge_data | default(false)
+
+- name: Remove Headscale configuration files
+  ansible.builtin.file:
+    path: "{{ headscale_config_dir }}/{{ item.dest }}"
+    state: absent
+  loop: "{{ headscale_templates }}"
+
+- name: Clear Headscale API key from .env file
+  ansible.builtin.lineinfile:
+    path: "{{ env_file }}"
+    regexp: '^HEADSCALE_API_KEY=.*'
+    line: "HEADSCALE_API_KEY="
+    backup: true
+  when: headscale_clear_api_key | default(true)
+
+- name: Notify nginx reload handler
+  ansible.builtin.debug:
+    msg: "Headscale removed, nginx configuration may need reload"
+  changed_when: true
+  notify: regenerate nginx configs

@@ -1,0 +1,48 @@
+# Docker Compose Headscale - POC
+# Version simplifiee sans conflit de ports
+
+services:
+  headscale:
+    image: headscale/headscale:${HEADSCALE_VERSION:-0.25}
+    container_name: headscale
+    hostname: headscale
+    ports:
+      # API/Control plane
+      - "8443:8443"
+      # Metrics Prometheus
+      - "9091:9090"
+    volumes:
+      - ./config.yaml:/etc/headscale/config.yaml:ro
+      - ./acls.yaml:/etc/headscale/acls.yaml:ro
+      - /data/headscale/data:/var/lib/headscale
+      - /data/headscale/run:/var/run/headscale
+      - /data/certs:/certs:ro
+    command: serve
+    restart: unless-stopped
+    networks:
+      - headscale-net
+      - apps-net
+    healthcheck:
+      test: ["CMD", "headscale", "version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+
+networks:
+  headscale-net:
+    driver: bridge
+  apps-net:
+    name: prod_apps-net
+    external: true

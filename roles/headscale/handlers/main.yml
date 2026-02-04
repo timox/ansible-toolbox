@@ -1,0 +1,21 @@
+---
+# =============================================================================
+# Headscale Role - Handlers
+# =============================================================================
+
+- name: restart headscale
+  community.docker.docker_container:
+    name: headscale
+    state: started
+    restart: true
+
+- name: restart headplane
+  community.docker.docker_container:
+    name: headplane
+    state: started
+    restart: true
+
+- name: regenerate nginx configs
+  ansible.builtin.debug:
+    msg: "Trigger nginx config regeneration in oauth2_proxy role"
+  changed_when: true

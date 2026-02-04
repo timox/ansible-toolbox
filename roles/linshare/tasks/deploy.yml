@@ -1,0 +1,43 @@
+---
+# =============================================================================
+# LinShare - Docker Compose Deployment
+# =============================================================================
+
+- name: Ensure required directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - "{{ linshare_data_dir }}/postgres"
+    - "{{ linshare_data_dir }}/mongodb"
+    - "{{ linshare_data_dir }}/files"
+    - "{{ linshare_data_dir }}/logs"
+    - "{{ linshare_data_dir }}/clamav"
+
+- name: Deploy LinShare via docker compose
+  community.docker.docker_compose_v2:
+    project_src: "{{ prod_dir }}/linshare"
+    project_name: linshare
+    files:
+      - docker-compose.linshare.yml
+    env_files:
+      - "{{ env_file }}"
+    profiles:
+      - linshare
+    state: "{{ linshare_state }}"
+  register: compose_result
+
+- name: Wait for LinShare backend to be healthy
+  ansible.builtin.command: >
+    docker inspect --format='{{ '{{' }}.State.Health.Status{{ '}}' }}' linshare-backend
+  register: health_check
+  until: health_check.stdout == 'healthy'
+  retries: 30
+  delay: 10
+  changed_when: false
+  when:
+    - linshare_state == 'present'
+    - not ansible_check_mode

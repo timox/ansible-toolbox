@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug - Token Claims</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #1a1a2e;
+            color: #eee;
+            padding: 20px;
+            margin: 0;
+        }
+        h1, h2 { color: #00d4ff; }
+        .section {
+            background: #16213e;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        pre {
+            background: #0f0f23;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .success { color: #00ff88; }
+        .error { color: #ff4444; }
+        .warning { color: #ffaa00; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            text-align: left;
+            padding: 8px;
+            border-bottom: 1px solid #333;
+        }
+        th { color: #00d4ff; }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #00d4ff;
+            text-decoration: none;
+        }
+        .back-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <a href="/" class="back-link">← Retour au portail</a>
+    <h1>Debug - Informations Token oauth2-proxy</h1>
+
+    <div class="section">
+        <h2>1. Headers nginx (/api/user)</h2>
+        <p>Ce que nginx voit des headers oauth2-proxy :</p>
+        <pre id="nginx-headers">Chargement...</pre>
+    </div>
+
+    <div class="section">
+        <h2>2. UserInfo oauth2-proxy (/oauth2/userinfo)</h2>
+        <p>Claims complets du token OIDC :</p>
+        <pre id="userinfo">Chargement...</pre>
+    </div>
+
+    <div class="section">
+        <h2>3. Debug Headers bruts (/debug/auth-headers)</h2>
+        <p>Headers X-Forwarded-* transmis par oauth2-proxy :</p>
+        <pre id="debug-headers">Chargement...</pre>
+    </div>
+
+    <div class="section">
+        <h2>4. Diagnostic Guacamole</h2>
+        <table>
+            <tr>
+                <th>Verification</th>
+                <th>Resultat</th>
+            </tr>
+            <tr>
+                <td>Header attendu par Guacamole</td>
+                <td><code>X-Forwarded-Preferred-Username</code></td>
+            </tr>
+            <tr>
+                <td>Valeur actuelle</td>
+                <td id="guac-header-value">-</td>
+            </tr>
+            <tr>
+                <td>Statut</td>
+                <td id="guac-status">-</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>5. Solution si preferred_username manque</h2>
+        <p>Si <code>preferred_username</code> est vide, deux options :</p>
+        <h3>Option A : Creer le mapper Keycloak</h3>
+        <pre>
+Keycloak → Clients → oauth2-proxy → Client scopes → oauth2-proxy-dedicated → Mappers
+
+Add mapper:
+  Name: preferred-username
+  Mapper Type: User Property
+  Property: username
+  Token Claim Name: preferred_username
+  Add to ID token: ON
+  Add to access token: ON
+        </pre>
+
+        <h3>Option B : Utiliser un autre header</h3>
+        <p>Modifier <code>guacamole.properties</code> pour utiliser le header qui contient le username :</p>
+        <pre id="alternative-config">
+# Si X-Forwarded-User contient le username :
+http-auth-header: X-Forwarded-User
+
+# Ou si c'est l'email :
+http-auth-header: X-Forwarded-Email
+        </pre>
+    </div>
+
+    <script>
+        // 1. Fetch /api/user
+        fetch('/api/user')
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('nginx-headers').textContent = JSON.stringify(data, null, 2);
+
+                // Update Guacamole diagnostic
+                const prefUsername = data.name || '';
+                document.getElementById('guac-header-value').textContent = prefUsername || '(vide)';
+
+                if (prefUsername && prefUsername !== 'undefined' && !prefUsername.includes('@')) {
+                    document.getElementById('guac-status').innerHTML = '<span class="success">OK - Username disponible</span>';
+                } else if (prefUsername && prefUsername.includes('@')) {
+                    document.getElementById('guac-status').innerHTML = '<span class="warning">Contient email au lieu du username</span>';
+                } else {
+                    document.getElementById('guac-status').innerHTML = '<span class="error">MANQUANT - Configurer mapper Keycloak</span>';
+                }
+            })
+            .catch(err => {
+                document.getElementById('nginx-headers').textContent = 'Erreur: ' + err.message;
+            });
+
+        // 2. Fetch /oauth2/userinfo
+        fetch('/oauth2/userinfo')
+            .then(r => {
+                if (!r.ok) throw new Error('Status ' + r.status);
+                return r.json();
+            })
+            .then(data => {
+                document.getElementById('userinfo').innerHTML = '<span class="success">Claims disponibles :</span>\n' + JSON.stringify(data, null, 2);
+            })
+            .catch(err => {
+                document.getElementById('userinfo').innerHTML = '<span class="error">Erreur: ' + err.message + '</span>\n\nCet endpoint peut ne pas etre disponible selon la config oauth2-proxy.';
+            });
+
+        // 3. Fetch /debug/auth-headers
+        fetch('/debug/auth-headers')
+            .then(r => r.text())
+            .then(text => {
+                document.getElementById('debug-headers').textContent = text;
+            })
+            .catch(err => {
+                document.getElementById('debug-headers').textContent = 'Erreur: ' + err.message;
+            });
+    </script>
+</body>
+</html>

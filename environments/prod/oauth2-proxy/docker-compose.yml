@@ -1,0 +1,104 @@
+services:
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:${OAUTH2_PROXY_VERSION:-v7.6.0}
+    container_name: oauth2-proxy
+    user: "0:0"  # Exécuter en tant que root pour lire les certificats SSL
+    ports:
+      - "4180:4180"    # HTTP (interne)
+      - "44180:44180"  # HTTPS
+      - "9090:9090"    # Metrics Prometheus
+    volumes:
+      - ./oauth2-proxy.cfg:/etc/oauth2-proxy.cfg:ro
+      - /data/certs:/certs:ro
+    command:
+      - --config=/etc/oauth2-proxy.cfg
+    environment:
+      - OAUTH2_PROXY_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
+      - OAUTH2_PROXY_COOKIE_SECRET=${COOKIE_SECRET}
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - auth-net
+    healthcheck:
+      # Image distroless - pas de shell, KEMP monitore /ping externellement
+      disable: true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  nginx-apps:
+    image: nginx:${NGINX_VERSION:-1.27-alpine}
+    container_name: nginx-apps
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      # Répertoire conf.d/ contient apps.conf + configs additionnelles (apps distantes)
+      # Les fichiers sont générés par deploy.sh depuis les *.template
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - /data/certs:/certs:ro
+      - ../portal/www:/usr/share/nginx/html/portal:ro
+    command: >
+      sh -c "rm -f /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"
+    restart: unless-stopped
+    networks:
+      auth-net:
+      apps-net:
+        # Alias DNS pour que les containers (headscale, etc.) puissent joindre
+        # keycloak.timox.org:443 via nginx sans hairpin NAT
+        aliases:
+          - ${KEYCLOAK_HOSTNAME:-keycloak.${DOMAIN}}
+      guacamole-net:
+      portal-net:
+      keycloak-net:
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Redis pour session storage (evite problemes de taille cookie >4KB)
+  redis:
+    image: redis:${REDIS_VERSION:-7.4-alpine}
+    container_name: oauth2-redis
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    networks:
+      - auth-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  redis-data:
+
+networks:
+  # Réseau créé par deploy.sh
+  auth-net:
+    external: true
+  # Réseau partagé entre services (créé par deploy.sh si nécessaire)
+  apps-net:
+    name: prod_apps-net
+    external: true
+  # Réseau partagé avec Guacamole (créé par deploy.sh)
+  guacamole-net:
+    external: true
+  # Réseau partagé avec credentials-api
+  portal-net:
+    external: true
+  # Réseau partagé avec Keycloak (proxy HTTPS)
+  keycloak-net:
+    external: true

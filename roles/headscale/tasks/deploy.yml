@@ -1,0 +1,70 @@
+---
+# =============================================================================
+# Headscale Deployment Tasks
+# =============================================================================
+
+- name: Ensure Headscale data directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ headscale_data_dir }}/data"
+    - "{{ headscale_data_dir }}/run"
+    - "/data/headplane"
+
+- name: Generate Headscale configurations from templates
+  ansible.builtin.include_tasks: generate_configs.yml
+
+- name: Check if Keycloak is accessible
+  ansible.builtin.uri:
+    url: "{{ keycloak_issuer }}/.well-known/openid-configuration"
+    method: GET
+    status_code: 200
+    validate_certs: false
+  register: keycloak_check
+  failed_when: false
+  changed_when: false
+  when: headscale_wait_for_keycloak
+  retries: 3
+  delay: 5
+
+- name: Warn if Keycloak is not accessible
+  ansible.builtin.debug:
+    msg: "WARNING: Keycloak not accessible at {{ keycloak_issuer }}. Headscale OIDC may not work."
+  when:
+    - headscale_wait_for_keycloak
+    - (keycloak_check.status | default(0)) != 200
+
+- name: Deploy Headscale via Docker Compose
+  community.docker.docker_compose_v2:
+    project_src: "{{ headscale_config_dir }}"
+    files:
+      - docker-compose.yml
+    env_files:
+      - "{{ env_file }}"
+    state: present
+    profiles: "{{ headscale_compose_profiles }}"
+  register: headscale_deploy
+
+- name: Wait for Headscale container to be healthy
+  ansible.builtin.command: >
+    docker inspect --format='{{ '{{' }}.State.Status{{ '}}' }}' headscale
+  register: headscale_health
+  changed_when: false
+  failed_when: false
+  retries: 30
+  delay: 2
+  until: headscale_health.stdout == 'running'
+  when: not ansible_check_mode
+
+- name: Generate Headscale API key for Headplane
+  ansible.builtin.include_tasks: generate_api_key.yml
+  when:
+    - vault_headscale_api_key is not defined or vault_headscale_api_key == ""
+
+- name: Notify nginx reload handler
+  ansible.builtin.debug:
+    msg: "Headscale deployed, nginx configuration may need reload"
+  changed_when: true
+  notify: regenerate nginx configs

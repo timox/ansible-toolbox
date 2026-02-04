@@ -312,6 +312,38 @@ create_template \
     0 \
     "[\\\"--extra-vars\\\", \\\"cisco_backup_git_push=false\\\"]"
 
+# --- Portal (hosts: portal_servers) ---
+create_template \
+    "Portal - Deploy Stack Complete" \
+    "playbooks/portal-site.yml" \
+    "$INV_FILE_ID" \
+    "$KEY_VAULT_ID"
+
+create_template \
+    "Portal - Dry Run" \
+    "playbooks/portal-site.yml" \
+    "$INV_FILE_ID" \
+    "$KEY_VAULT_ID" \
+    "[\\\"--check\\\", \\\"--diff\\\"]"
+
+SURVEY_SERVICE='[{"name":"service","title":"Service name","required":true,"type":"","enum":["keycloak","oauth2-proxy","guacamole","credentials-api","portal-api","vaultwarden","headscale","linshare","bookstack"]}]'
+create_template \
+    "Portal - Deploy Service" \
+    "playbooks/portal-deploy-service.yml" \
+    "$INV_FILE_ID" \
+    "$KEY_VAULT_ID" \
+    "" \
+    "$SURVEY_SERVICE"
+
+SURVEY_DESTROY='[{"name":"service","title":"Service to destroy","required":true,"type":"","enum":["all","keycloak","oauth2-proxy","guacamole","credentials-api","portal-api","vaultwarden","headscale","linshare","bookstack"]},{"name":"confirm","title":"Confirm destruction","required":true,"type":"","enum":["true","false"]}]'
+create_template \
+    "Portal - Destroy Service" \
+    "playbooks/portal-destroy.yml" \
+    "$INV_FILE_ID" \
+    "$KEY_VAULT_ID" \
+    "" \
+    "$SURVEY_DESTROY"
+
 echo ""
 echo "=============================================="
 echo " Setup termine"
@@ -328,6 +360,10 @@ echo "  - Deploy - Zabbix Agent 2"
 echo "  - Deploy - Zabbix Agent 2 (Dry Run)"
 echo "  - Backup - Cisco configs"
 echo "  - Backup - Cisco configs (no push)"
+echo "  - Portal - Deploy Stack Complete"
+echo "  - Portal - Dry Run"
+echo "  - Portal - Deploy Service"
+echo "  - Portal - Destroy Service"
 echo ""
 echo "Prochaines etapes :"
 echo "  1. Verifier les credentials dans Key Store (SSH key, Cisco, vault)"

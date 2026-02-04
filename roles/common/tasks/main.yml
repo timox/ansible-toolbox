@@ -1,0 +1,15 @@
+---
+- name: Prerequisites
+  ansible.builtin.include_tasks: prerequisites.yml
+
+- name: Create data directories
+  ansible.builtin.include_tasks: directories.yml
+
+- name: Configure certificates
+  ansible.builtin.include_tasks: certificates.yml
+
+- name: Auto-generate secrets
+  ansible.builtin.include_tasks: secrets.yml
+
+- name: Create Docker networks
+  ansible.builtin.include_tasks: docker_networks.yml

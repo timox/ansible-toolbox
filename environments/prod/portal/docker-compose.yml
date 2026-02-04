@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  portal-nginx:
+    image: nginx:${NGINX_VERSION:-1.27-alpine}
+    container_name: portal-nginx
+    ports:
+      - "8443:443"    # Port HTTPS portail
+      - "8080:80"     # Port HTTP (redirect)
+    volumes:
+      # Configuration nginx
+      - ./nginx/portal.conf:/etc/nginx/conf.d/portal.conf:ro
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+
+      # Fichiers statiques du portail
+      - ./www:/usr/share/nginx/html/portal:ro
+
+      # Certificats SSL
+      - /data/certs:/certs:ro
+
+      # Logs
+      - ./logs:/var/log/nginx
+    restart: unless-stopped
+    networks:
+      - auth-net
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "com.example.service=portal"
+      - "com.example.description=Portail applications oauth2-proxy"
+    depends_on:
+      - portal-api
+
+  portal-api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: portal-api
+    volumes:
+      - /data/portal:/data
+    environment:
+      - DATA_DIR=/data
+    restart: unless-stopped
+    networks:
+      - auth-net
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "com.example.service=portal-api"
+      - "com.example.description=API backend pour gestion applications portail"
+
+networks:
+  auth-net:
+    external: true  # Réseau partagé avec oauth2-proxy

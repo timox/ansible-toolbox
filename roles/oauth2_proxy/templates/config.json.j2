@@ -1,0 +1,9 @@
+{
+  "issuer": "{{ keycloak_issuer }}",
+  "domain": "{{ domain }}",
+  "portalUrl": "https://{{ portal_hostname_resolved }}",
+  "keycloakUrl": "https://{{ keycloak_hostname }}",
+  "buildDate": "{{ build_date }}",
+  "adminGroup": "{{ portal_admin_group }}",
+  "vaultwardenEnabled": {{ vaultwarden_enabled | lower }}
+}

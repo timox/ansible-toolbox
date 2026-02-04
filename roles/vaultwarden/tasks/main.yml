@@ -1,0 +1,7 @@
+---
+- name: Deploy Vaultwarden
+  ansible.builtin.include_tasks: deploy.yml
+  when: deploy_vaultwarden | bool
+  tags:
+    - vaultwarden
+    - vaultwarden-deploy

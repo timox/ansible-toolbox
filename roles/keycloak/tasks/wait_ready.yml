@@ -1,0 +1,68 @@
+---
+# =============================================================================
+# Role keycloak - Wait for Keycloak readiness
+# =============================================================================
+# Polls the OIDC discovery endpoint until Keycloak is available
+
+- name: Extract realm from keycloak_issuer
+  ansible.builtin.set_fact:
+    keycloak_realm_name: "{{ keycloak_issuer | regex_replace('^.*/realms/([^/]+).*$', '\\1') }}"
+  tags:
+    - keycloak-readiness
+
+- name: Construct OIDC discovery URL
+  ansible.builtin.set_fact:
+    keycloak_discovery_url: "{{ keycloak_backend_url }}/realms/{{ keycloak_realm_name }}/.well-known/openid-configuration"
+  tags:
+    - keycloak-readiness
+
+- name: Display readiness check information
+  ansible.builtin.debug:
+    msg:
+      - "Checking Keycloak readiness..."
+      - "Issuer: {{ keycloak_issuer }}"
+      - "Realm: {{ keycloak_realm_name }}"
+      - "Discovery URL: {{ keycloak_discovery_url }}"
+      - "Max retries: {{ keycloak_readiness_retries }}"
+      - "Delay: {{ keycloak_readiness_delay }}s"
+  tags:
+    - keycloak-readiness
+
+- name: Wait for Keycloak OIDC discovery endpoint
+  ansible.builtin.uri:
+    url: "{{ keycloak_discovery_url }}"
+    method: GET
+    status_code: 200
+    validate_certs: false
+    timeout: 10
+  register: keycloak_discovery_check
+  until: keycloak_discovery_check.status == 200
+  retries: "{{ keycloak_readiness_retries }}"
+  delay: "{{ keycloak_readiness_delay }}"
+  changed_when: false
+  tags:
+    - keycloak-readiness
+
+- name: Display Keycloak readiness confirmation
+  ansible.builtin.debug:
+    msg:
+      - "Keycloak is ready and responding!"
+      - "OIDC Issuer: {{ keycloak_discovery_check.json.issuer | default('N/A') }}"
+      - "Authorization endpoint: {{ keycloak_discovery_check.json.authorization_endpoint | default('N/A') }}"
+  when: keycloak_discovery_check is succeeded
+  tags:
+    - keycloak-readiness
+
+- name: Verify issuer matches expected value
+  ansible.builtin.assert:
+    that:
+      - keycloak_discovery_check.json.issuer == keycloak_issuer
+    fail_msg: >-
+      Keycloak issuer mismatch! Expected: {{ keycloak_issuer }},
+      Got: {{ keycloak_discovery_check.json.issuer | default('unknown') }}
+    success_msg: "Keycloak issuer verified successfully"
+  when:
+    - keycloak_discovery_check is not skipped
+    - keycloak_discovery_check.json is defined
+  tags:
+    - keycloak-readiness
