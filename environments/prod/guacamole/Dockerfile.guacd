@@ -1,0 +1,204 @@
+# Dockerfile optimisé Guacamole Daemon avec FreeRDP compilé
+FROM debian:bookworm-slim as builder
+
+# Variables build
+ENV FREERDP_VERSION="2.11.7" \
+    GUACAMOLE_VERSION="1.6.0" \
+    PREFIX_DIR="/opt/guacamole"
+
+# Installation dépendances build
+# hadolint ignore=DL3008
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    build-essential \
+    cmake \
+    git \
+    pkg-config \
+    libssl-dev \
+    libx11-dev \
+    libxext-dev \
+    libxinerama-dev \
+    libxcursor-dev \
+    libxdamage-dev \
+    libxv-dev \
+    libxkbfile-dev \
+    libasound2-dev \
+    libcups2-dev \
+    libxml2-dev \
+    libxrandr-dev \
+    libgstreamer1.0-dev \
+    libgstreamer-plugins-base1.0-dev \
+    libxi-dev \
+    libavutil-dev \
+    libavcodec-dev \
+    libavformat-dev \
+    libswscale-dev \
+    libswresample-dev \
+    libusb-1.0-0-dev \
+    libudev-dev \
+    libdbus-glib-1-dev \
+    libpng-dev \
+    libjpeg-dev \
+    libcairo2-dev \
+    libossp-uuid-dev \
+    libvncserver-dev \
+    libpulse-dev \
+    libvorbis-dev \
+    libwebp-dev \
+    libtelnet-dev \
+    libssh2-1-dev \
+    libpango1.0-dev \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Build FreeRDP optimisé
+# Use release tarball instead of git clone to avoid GitHub rate limiting in CI
+WORKDIR /tmp
+RUN wget -q "https://github.com/FreeRDP/FreeRDP/archive/refs/tags/${FREERDP_VERSION}.tar.gz" -O freerdp.tar.gz && \
+    tar -xzf freerdp.tar.gz && \
+    rm freerdp.tar.gz
+WORKDIR /tmp/FreeRDP-${FREERDP_VERSION}
+# shellcheck disable=SC2046
+RUN cmake -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_INSTALL_PREFIX="${PREFIX_DIR}" \
+          -DWITH_WAYLAND=OFF \
+          -DWITH_X11=ON \
+          -DWITH_PULSE=ON \
+          -DWITH_ALSA=ON \
+          -DWITH_CUPS=ON \
+          -DWITH_CHANNELS=ON \
+          -DWITH_CLIENT_CHANNELS=ON \
+          -DWITH_SERVER_CHANNELS=ON \
+          -DBUILTIN_CHANNELS=OFF \
+          -DWITH_UNICODE_BUILTIN=ON \
+          -DWITH_MANPAGES=OFF \
+          -DWITH_PROFILER=OFF \
+          -DWITH_GPROF=OFF \
+          -DWITH_SSE2=ON \
+          -DWITH_NEON=OFF \
+          -DWITH_IPP=OFF \
+          -DWITH_JPEG=ON \
+          -DWITH_PNG=ON \
+          -DWITH_ZLIB=ON \
+          -DWITH_OPENSSL=ON \
+          -DWITH_GSSAPI=OFF \
+          -DWITH_PCSC=OFF \
+          -DWITH_PKCS11=OFF \
+          -DWITH_SWSCALE=ON \
+          -DWITH_FFMPEG=ON \
+          -DWITH_DSP_FFMPEG=ON \
+          -DWITH_VAAPI=OFF \
+          -DWITH_PLATFORM_SERVER=OFF \
+          -DWITH_SHADOW=OFF \
+          -DWITH_PROXY=OFF \
+          . && \
+    make -j"$(nproc)" && \
+    make install && \
+    ldconfig
+
+# Build Guacamole Server optimisé
+WORKDIR /tmp
+RUN wget -q "https://archive.apache.org/dist/guacamole/${GUACAMOLE_VERSION}/source/guacamole-server-${GUACAMOLE_VERSION}.tar.gz" && \
+    tar -xzf guacamole-server-${GUACAMOLE_VERSION}.tar.gz
+WORKDIR /tmp/guacamole-server-${GUACAMOLE_VERSION}
+
+# Configuration optimisée
+# shellcheck disable=SC2046
+RUN PKG_CONFIG_PATH="${PREFIX_DIR}/lib/pkgconfig" \
+    LD_LIBRARY_PATH="${PREFIX_DIR}/lib" \
+    ./configure \
+        --prefix=${PREFIX_DIR} \
+        --with-freerdp=${PREFIX_DIR} \
+        --enable-allow-freerdp-snapshots \
+        --with-libavcodec \
+        --with-libavformat \
+        --with-libavutil \
+        --with-libswscale \
+        --with-libswresample \
+        --with-pulse \
+        --with-vorbis \
+        --with-webp \
+        --with-vnc \
+        --with-ssh \
+        --with-telnet \
+        --with-kubernetes && \
+    make -j"$(nproc)" && \
+    make install
+
+# Image runtime optimisée
+FROM debian:bookworm-slim
+
+# Dépendances runtime
+# hadolint ignore=DL3008
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    ghostscript \
+    fonts-liberation \
+    fonts-dejavu \
+    xfonts-terminus \
+    libcairo2 \
+    libjpeg62-turbo \
+    libossp-uuid16 \
+    libpng16-16 \
+    libpulse0 \
+    libssh2-1 \
+    libssl3 \
+    libtelnet2 \
+    libvorbis0a \
+    libvorbisenc2 \
+    libwebp7 \
+    libvncclient1 \
+    libx11-6 \
+    libxext6 \
+    libxinerama1 \
+    libxcursor1 \
+    libxdamage1 \
+    libxv1 \
+    libxi6 \
+    libxrandr2 \
+    libxkbfile1 \
+    libgstreamer1.0-0 \
+    libgstreamer-plugins-base1.0-0 \
+    libusb-1.0-0 \
+    libudev1 \
+    libavutil57 \
+    libavcodec59 \
+    libavformat59 \
+    libswscale6 \
+    libswresample4 \
+    libasound2 \
+    libcups2 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copier binaires optimisés
+COPY --from=builder /opt/guacamole /opt/guacamole
+
+# Configuration environnement
+ENV PATH="/opt/guacamole/sbin:/opt/guacamole/bin:${PATH}" \
+    LD_LIBRARY_PATH="/opt/guacamole/lib:${LD_LIBRARY_PATH}" \
+    GUACD_LOG_LEVEL="info" \
+    GUACD_PID_FILE="/run/guacd/guacd.pid"
+
+# Créer utilisateur guacd
+RUN groupadd --gid 1000 guacd && \
+    useradd --system --create-home --shell /sbin/nologin --uid 1000 --gid 1000 guacd
+
+# Répertoires
+RUN mkdir -p /drive /record && \
+    chown -R guacd:guacd /drive /record
+
+RUN mkdir -p /etc/guacamole && \
+    install -d -o guacd -g guacd -m 755 /run/guacd
+
+# Configuration guacd optimisée
+COPY guacd.conf /etc/guacamole/guacd.conf
+
+# Script de démarrage optimisé
+COPY guacd-entrypoint.sh /opt/guacamole/bin/
+RUN chmod +x /opt/guacamole/bin/guacd-entrypoint.sh
+
+EXPOSE 4822
+
+ENTRYPOINT ["/opt/guacamole/bin/guacd-entrypoint.sh"]

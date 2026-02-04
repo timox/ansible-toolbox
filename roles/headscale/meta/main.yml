@@ -1,0 +1,34 @@
+---
+# =============================================================================
+# Headscale Role - Metadata
+# =============================================================================
+
+galaxy_info:
+  author: Ansible Workflows
+  description: Deploy Headscale VPN mesh with OIDC authentication
+  license: MIT
+  min_ansible_version: "2.12"
+
+  platforms:
+    - name: Debian
+      versions:
+        - bullseye
+        - bookworm
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+
+  galaxy_tags:
+    - vpn
+    - headscale
+    - tailscale
+    - oidc
+    - docker
+
+dependencies: []
+
+# Role dependencies (if any)
+# dependencies:
+#   - role: common
+#     when: headscale_require_common | default(false)

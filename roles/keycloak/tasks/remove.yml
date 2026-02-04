@@ -1,0 +1,30 @@
+---
+# =============================================================================
+# Role keycloak - Remove Keycloak deployment
+# =============================================================================
+
+- name: Stop and remove Keycloak using docker compose
+  community.docker.docker_compose_v2:
+    project_src: "{{ keycloak_compose_project_src }}"
+    project_name: keycloak
+    files:
+      - "{{ keycloak_compose_file }}"
+    state: absent
+  register: keycloak_remove_result
+  tags:
+    - keycloak-remove
+
+- name: Remove keycloak-net network
+  community.docker.docker_network:
+    name: keycloak-net
+    state: absent
+  tags:
+    - keycloak-remove
+    - keycloak-network
+
+- name: Display removal confirmation
+  ansible.builtin.debug:
+    msg: "Keycloak services removed successfully"
+  when: keycloak_remove_result.changed
+  tags:
+    - keycloak-remove

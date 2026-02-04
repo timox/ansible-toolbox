@@ -1,0 +1,20 @@
+---
+# =============================================================================
+# Role keycloak - Handlers
+# =============================================================================
+
+- name: keycloak deployed
+  ansible.builtin.debug:
+    msg: "Keycloak has been deployed successfully"
+
+- name: restart keycloak
+  community.docker.docker_compose_v2:
+    project_src: "{{ keycloak_compose_project_src }}"
+    project_name: keycloak
+    files:
+      - "{{ keycloak_compose_file }}"
+    env_files:
+      - "{{ keycloak_compose_env_file }}"
+    state: restarted
+  tags:
+    - keycloak-restart

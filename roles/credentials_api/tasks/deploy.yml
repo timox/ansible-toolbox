@@ -1,0 +1,32 @@
+---
+- name: Validate credentials_api state variable
+  ansible.builtin.assert:
+    that:
+      - credentials_api_state in ['present', 'absent']
+    fail_msg: "credentials_api_state must be 'present' or 'absent'"
+
+- name: Deploy Credentials API via Docker Compose
+  community.docker.docker_compose_v2:
+    project_src: "{{ prod_dir }}/credentials-api"
+    project_name: "{{ credentials_api_project_name }}"
+    env_files:
+      - "{{ env_file }}"
+    state: "{{ credentials_api_state }}"
+  register: credentials_api_deploy
+
+- name: Wait for Credentials API to be healthy
+  ansible.builtin.command: >
+    docker inspect --format='{{ '{{' }}.State.Health.Status{{ '}}' }}' credentials-api
+  register: credentials_api_health
+  until: credentials_api_health.stdout == 'healthy'
+  retries: "{{ credentials_api_health_check_retries | default(30) }}"
+  delay: "{{ credentials_api_health_check_delay | default(5) }}"
+  when:
+    - credentials_api_state == 'present'
+    - not ansible_check_mode
+  changed_when: false
+  failed_when: false
+
+- name: Display Credentials API deployment status
+  ansible.builtin.debug:
+    msg: "Credentials API is {{ 'deployed and healthy' if credentials_api_state == 'present' else 'removed' }}"

@@ -1,0 +1,26 @@
+---
+# =============================================================================
+# PORTAL API ROLE - Defaults
+# =============================================================================
+# User-configurable defaults for Portal API deployment
+
+portal_api_state: present
+portal_api_project_name: portal-api
+
+# Config generation variables
+portal_api_admin_group: "{{ admin_group | default('admin-infra') }}"
+portal_api_vaultwarden_enabled: "{{ deploy_vaultwarden | default(false) }}"
+portal_api_build_date: "{{ ansible_date_time.iso8601 }}"
+portal_api_poc_ip: "{{ ansible_default_ipv4.address }}"
+
+# Hostnames (calculated from domain if empty)
+portal_api_portal_hostname: "{{ portal_hostname | default('') }}"
+portal_api_guacamole_hostname: "{{ guacamole_hostname | default('') }}"
+portal_api_vaultwarden_hostname: "{{ vaultwarden_hostname | default('') }}"
+portal_api_linshare_hostname: "{{ linshare_hostname | default('') }}"
+portal_api_linshare_admin_hostname: "{{ linshare_admin_hostname | default('') }}"
+portal_api_headscale_hostname: "{{ headscale_hostname | default('') }}"
+
+# Health check settings
+portal_api_health_check_retries: 30
+portal_api_health_check_delay: 10

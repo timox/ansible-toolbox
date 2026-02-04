@@ -1,0 +1,94 @@
+# =============================================================================
+# Utilisateurs de test
+# Mot de passe: Test123! (encode en SSHA)
+# =============================================================================
+
+# Admin Infrastructure - acces complet
+dn: uid=admin.infra,ou=users,dc=poc,dc=local
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: admin.infra
+sn: Infra
+givenName: Admin
+cn: Admin Infra
+displayName: Admin Infra
+mail: admin.infra@poc.local
+uidNumber: 10001
+gidNumber: 10000
+homeDirectory: /home/admin.infra
+loginShell: /bin/bash
+# Password: Test123!
+userPassword: {SSHA}OMPSPTuJDCX2/PZ6MbI9hvATPdfDmiHk
+
+# Admin Applicatif - monitoring et services
+dn: uid=admin.app,ou=users,dc=poc,dc=local
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: admin.app
+sn: App
+givenName: Admin
+cn: Admin App
+displayName: Admin App
+mail: admin.app@poc.local
+uidNumber: 10002
+gidNumber: 10000
+homeDirectory: /home/admin.app
+loginShell: /bin/bash
+# Password: Test123!
+userPassword: {SSHA}OMPSPTuJDCX2/PZ6MbI9hvATPdfDmiHk
+
+# Utilisateur standard
+dn: uid=user.test,ou=users,dc=poc,dc=local
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: user.test
+sn: Test
+givenName: User
+cn: User Test
+displayName: User Test
+mail: user.test@poc.local
+uidNumber: 10003
+gidNumber: 10000
+homeDirectory: /home/user.test
+loginShell: /bin/bash
+# Password: Test123!
+userPassword: {SSHA}OMPSPTuJDCX2/PZ6MbI9hvATPdfDmiHk
+
+# Utilisateur multi-groupes (admin-app + utilisateurs)
+dn: uid=user.multi,ou=users,dc=poc,dc=local
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: user.multi
+sn: Multi
+givenName: User
+cn: User Multi
+displayName: User Multi
+mail: user.multi@poc.local
+uidNumber: 10004
+gidNumber: 10000
+homeDirectory: /home/user.multi
+loginShell: /bin/bash
+# Password: Test123!
+userPassword: {SSHA}OMPSPTuJDCX2/PZ6MbI9hvATPdfDmiHk
+
+# Utilisateur desactive (pour tester la gestion des comptes)
+dn: uid=user.disabled,ou=users,dc=poc,dc=local
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: user.disabled
+sn: Disabled
+givenName: User
+cn: User Disabled
+displayName: User Disabled (Compte desactive)
+mail: user.disabled@poc.local
+uidNumber: 10005
+gidNumber: 10000
+homeDirectory: /home/user.disabled
+loginShell: /sbin/nologin
+# Password: Test123!
+userPassword: {SSHA}OMPSPTuJDCX2/PZ6MbI9hvATPdfDmiHk

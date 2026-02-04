@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portail Applications</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1>Portail</h1>
+                <small>Console d'administration</small>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-title">Navigation</div>
+                    <a class="nav-item active" data-view="dashboard" onclick="showView('dashboard')">
+                        <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
+                        </svg>
+                        Tableau de bord
+                    </a>
+                    <a class="nav-item" data-view="apps" onclick="showView('apps')">
+                        <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                        </svg>
+                        Applications
+                    </a>
+                </div>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Mon compte</div>
+                    <a class="nav-item" data-view="credentials" onclick="showView('credentials')">
+                        <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+                        </svg>
+                        Credentials RDP
+                    </a>
+                </div>
+
+                <div class="nav-section" id="admin-nav" style="display: none;">
+                    <div class="nav-section-title">Administration</div>
+                    <a class="nav-item" data-view="admin-apps" onclick="showView('admin-apps')">
+                        <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                        Gestion apps
+                    </a>
+                    <a class="nav-item" data-view="admin-config" onclick="showView('admin-config')">
+                        <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+                        </svg>
+                        Configuration
+                    </a>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-block">
+                    <div class="user-avatar" id="user-avatar">--</div>
+                    <div class="user-info-block">
+                        <div class="user-name" id="username" onclick="showProfileModal()" title="Voir le profil">Chargement...</div>
+                        <div class="user-email" id="user-email"></div>
+                    </div>
+                    <button class="btn-logout" onclick="logout()" title="Deconnexion">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Dashboard View -->
+            <div id="view-dashboard" class="view">
+                <header class="content-header">
+                    <h2>Tableau de bord</h2>
+                    <div class="header-actions">
+                        <span class="text-muted text-small" id="current-date"></span>
+                    </div>
+                </header>
+                <div class="content-body">
+                    <div class="dashboard-stats">
+                        <div class="stat-card">
+                            <div class="stat-label">Applications accessibles</div>
+                            <div class="stat-value accent" id="stat-apps">-</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Vos groupes</div>
+                            <div class="stat-value" id="stat-groups">-</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Statut</div>
+                            <div class="stat-value success">Connecte</div>
+                        </div>
+                    </div>
+
+                    <h3 class="section-title">Acces rapide</h3>
+                    <div id="quick-apps" class="apps-grid"></div>
+                </div>
+            </div>
+
+            <!-- Applications View -->
+            <div id="view-apps" class="view hidden">
+                <header class="content-header">
+                    <h2>Applications</h2>
+                    <div class="header-actions">
+                        <div class="search-bar">
+                            <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                            </svg>
+                            <input type="search" id="search" class="search-input" placeholder="Rechercher..." autocomplete="off">
+                        </div>
+                    </div>
+                </header>
+                <div class="content-body">
+                    <div id="apps-grid" class="apps-grid"></div>
+                </div>
+            </div>
+
+            <!-- Admin Apps View -->
+            <div id="view-admin-apps" class="view hidden">
+                <header class="content-header">
+                    <h2>Gestion des applications</h2>
+                    <div class="header-actions">
+                        <button class="btn btn-primary btn-sm" onclick="showAddAppModal()">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                            </svg>
+                            Ajouter
+                        </button>
+                    </div>
+                </header>
+                <div class="content-body">
+                    <div class="data-table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Application</th>
+                                    <th>URL</th>
+                                    <th>Groupes</th>
+                                    <th>Type</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-apps-table"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Admin Config View -->
+            <div id="view-admin-config" class="view hidden">
+                <header class="content-header">
+                    <h2>Configuration systeme</h2>
+                </header>
+                <div class="content-body">
+                    <div class="config-grid" id="admin-config"></div>
+                    <p class="config-help">Pour modifier: editer <code>.env</code> puis <code>./redeploy.sh --config --all</code></p>
+                </div>
+            </div>
+
+            <!-- Credentials View -->
+            <div id="view-credentials" class="view hidden">
+                <header class="content-header">
+                    <h2>Credentials RDP</h2>
+                    <div class="header-actions">
+                        <button class="btn btn-primary btn-sm" onclick="showAddCredentialModal()">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                            </svg>
+                            Ajouter
+                        </button>
+                    </div>
+                </header>
+                <div class="content-body">
+                    <div class="credentials-container">
+                        <!-- Liste des credentials existants -->
+                        <div id="credentials-list">
+                            <p class="text-muted">Chargement...</p>
+                        </div>
+
+                        <div class="credentials-info mt-3">
+                            <h4>Informations</h4>
+                            <ul class="text-small text-muted">
+                                <li>Configurez un credential par connexion Guacamole</li>
+                                <li>Les mots de passe sont chiffres en AES-256</li>
+                                <li>Les credentials expirent automatiquement apres 8 heures</li>
+                                <li>Le mot de passe n'est jamais stocke en clair</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal ajout credential -->
+            <div id="credential-modal" class="modal" style="display: none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Ajouter un credential</h3>
+                        <button class="modal-close" onclick="closeCredentialModal()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="credential-form" onsubmit="saveCredential(event)">
+                            <div class="form-group">
+                                <label for="cred-connection">Connexion</label>
+                                <select id="cred-connection" required>
+                                    <option value="">Chargement...</option>
+                                </select>
+                                <span class="form-hint">Selectionnez la connexion Guacamole</span>
+                            </div>
+                            <div class="form-group">
+                                <label for="cred-login">Login AD</label>
+                                <input type="text" id="cred-login" required autocomplete="username">
+                                <span class="form-hint">Votre identifiant Windows (ex: foucartt)</span>
+                            </div>
+                            <div class="form-group">
+                                <label for="cred-password">Mot de passe AD</label>
+                                <input type="password" id="cred-password" required autocomplete="current-password">
+                            </div>
+                            <div class="form-group">
+                                <label for="cred-password-confirm">Confirmer le mot de passe</label>
+                                <input type="password" id="cred-password-confirm" required>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" onclick="closeCredentialModal()">Annuler</button>
+                        <button type="submit" form="credential-form" class="btn btn-primary">Enregistrer</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal profil utilisateur -->
+    <div id="profile-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Profil utilisateur</h3>
+                <button class="modal-close" onclick="closeProfileModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="profile-details" class="profile-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal groupes utilisateur -->
+    <div id="groups-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Vos groupes</h3>
+                <button class="modal-close" onclick="closeGroupsModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="groups-list" class="groups-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal ajout/edition application -->
+    <div id="app-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">Ajouter une application</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="app-form" onsubmit="saveApp(event)">
+                    <input type="hidden" id="app-id" value="">
+                    <div class="form-group">
+                        <label for="app-name">Nom</label>
+                        <input type="text" id="app-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="app-description">Description</label>
+                        <input type="text" id="app-description" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="app-icon">Icone (emoji)</label>
+                        <input type="text" id="app-icon" value="" required>
+                        <span class="form-hint">Ex: G, Z, N ou emoji</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="app-url">URL</label>
+                        <input type="url" id="app-url" placeholder="https://app.example.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="app-groups">Groupes autorises</label>
+                        <input type="text" id="app-groups" placeholder="admin, utilisateur">
+                        <span class="form-hint">Separes par virgule. Vide = tous</span>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="app-oidc-enabled" onchange="toggleOidcFields()">
+                            Authentification OIDC via Keycloak
+                        </label>
+                    </div>
+                    <div id="oidc-fields" style="display: none;">
+                        <div class="form-group">
+                            <label for="app-oidc-realm">Realm OIDC</label>
+                            <input type="text" id="app-oidc-realm" placeholder="oidc">
+                        </div>
+                        <div class="form-group">
+                            <label for="app-oidc-client-id">Client ID</label>
+                            <input type="text" id="app-oidc-client-id" placeholder="guacamole-remote">
+                        </div>
+                        <div class="form-group">
+                            <label for="app-oidc-idp-hint">IDP Hint (alias)</label>
+                            <input type="text" id="app-oidc-idp-hint" placeholder="poga-idp">
+                        </div>
+                        <div class="form-group">
+                            <label for="app-oidc-redirect-uri">Redirect URI</label>
+                            <input type="text" id="app-oidc-redirect-uri" placeholder="https://remote.sdis25.fr/">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+                <button type="submit" form="app-form" class="btn btn-primary">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="portal.js"></script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+---
+# =============================================================================
+# DOCKER_APP ROLE - Handlers
+# =============================================================================
+# Generic restart handler that listens on "restart <docker_app_name>".
+# Calling roles should define their own specific handlers for named containers.
+#
+# Usage from calling role:
+#   notify: "restart myapp"
+#
+# Then in the calling role's handlers/main.yml:
+#   - name: restart myapp
+#     community.docker.docker_container:
+#       name: myapp-container
+#       state: started
+#       restart: true
+#
+# Alternatively, use the restart_container.yml include task directly:
+#   - name: Restart my container
+#     ansible.builtin.include_tasks:
+#       file: "{{ role_path }}/../docker_app/tasks/restart_container.yml"
+#     vars:
+#       restart_container_name: myapp-container
+
+# Placeholder handler - calling roles should override with specific handlers
+- name: Docker app restart placeholder
+  ansible.builtin.debug:
+    msg: "Handler triggered for {{ docker_app_name }}. Define specific handlers in your role."
+  listen: "restart {{ docker_app_name }}"

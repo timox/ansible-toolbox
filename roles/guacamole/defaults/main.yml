@@ -1,0 +1,76 @@
+---
+# =============================================================================
+# GUACAMOLE ROLE - Default Variables
+# =============================================================================
+# These values can be overridden in group_vars, host_vars, or playbook vars
+
+# Guacamole service state
+guacamole_state: present  # present or absent
+
+# Docker Compose configuration
+guacamole_compose_path: "{{ prod_dir }}/guacamole/docker-compose.yml"
+guacamole_compose_project: guacamole
+
+# Configuration paths
+guacamole_config_dir: "{{ data_dir }}/guacamole"
+guacamole_properties_path: "{{ guacamole_config_dir }}/guacamole.properties"
+guacamole_properties_template: guacamole.properties.j2
+
+# Database configuration
+guacamole_db_name: guacamole_db
+guacamole_db_user: guacamole_user
+guacamole_postgres_data_path: "{{ guacamole_config_dir }}/postgres"
+
+# PostgreSQL connection settings
+guacamole_postgres_hostname: guacamole-db
+guacamole_postgres_port: 5432
+guacamole_postgres_max_connections: 120
+guacamole_postgres_max_connections_per_user: 6
+guacamole_postgres_absolute_max_connections: 0
+guacamole_postgres_default_max_connections: 0
+guacamole_postgres_default_max_group_connections: 0
+guacamole_postgres_absolute_max_group_connections: 0
+
+# guacd daemon configuration
+guacamole_daemon_hostname: guacamole-daemon
+guacamole_daemon_port: 4822
+
+# IMPORTANT: guacamole-daemon uses network_mode: host to access local network
+# for RDP/SSH/VNC connections to physical machines
+# guacamole-web uses extra_hosts: guacamole-daemon:host-gateway to reach it
+
+# OIDC configuration
+guacamole_oidc_scope: "openid email profile groups"
+guacamole_oidc_username_claim: preferred_username
+guacamole_oidc_groups_claim: groups
+guacamole_oidc_allowed_clock_skew: 30
+guacamole_oidc_max_token_validity: 480
+guacamole_oidc_max_nonce_validity: 10
+
+# WebSocket and timeouts
+guacamole_enable_websocket: true
+guacamole_websocket_allow_remote: true
+guacamole_api_session_timeout: 28800  # 8 hours
+
+# Recording and storage
+guacamole_recording_path: /record
+guacamole_create_recording_path: true
+
+# Drive sharing (isolation per user via connection params)
+# Default path if not configured at connection level
+guacamole_drive_path: /drive
+guacamole_create_drive_path: true
+
+# Interface configuration
+guacamole_available_languages: "fr, en"
+
+# Security settings
+guacamole_skip_if_unavailable: postgresql
+guacamole_allow_environment: true
+
+# Extension priority (openid first, then jdbc for storage)
+guacamole_extension_priority: "openid, jdbc"
+
+# Health check configuration
+guacamole_health_check_timeout: 30
+guacamole_health_check_retries: 3

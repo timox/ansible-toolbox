@@ -1,0 +1,115 @@
+# Configuration nginx pour Portail Applications
+# Template - Remplacer ${DOMAIN} par envsubst
+
+# Endpoint API pour exposer headers oauth2-proxy
+server {
+    listen 80;
+    server_name portail.${DOMAIN};
+
+    # Redirection HTTPS
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name portail.${DOMAIN};
+
+    ssl_certificate /certs/wildcard.${DOMAIN}.crt;
+    ssl_certificate_key /certs/wildcard.${DOMAIN}.key;
+
+    # SSL configuration
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    # Tracabilite et debug
+    access_log /var/log/nginx/portail-access.log portal_audit;
+    error_log /var/log/nginx/portail-error.log;
+    add_header X-Request-Id $trace_id always;
+
+    # Root pour fichiers statiques
+    root /usr/share/nginx/html/portal;
+    index index.html;
+
+    # Protections HTTP
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header Content-Security-Policy "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; script-src 'self'; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+    add_header Cross-Origin-Resource-Policy "same-origin" always;
+    add_header Cross-Origin-Opener-Policy "same-origin" always;
+
+    # Authentification obligatoire pour tout le site
+    auth_request /oauth2/auth;
+    error_page 401 = /oauth2/sign_in;
+
+    # Récupérer headers utilisateur depuis oauth2-proxy
+    auth_request_set $user $upstream_http_x_auth_request_user;
+    auth_request_set $email $upstream_http_x_auth_request_email;
+    auth_request_set $groups $upstream_http_x_auth_request_groups;
+    auth_request_set $name $upstream_http_x_auth_request_preferred_username;
+
+    # API backend pour gestion applications (portal-api)
+    location /api/ {
+        proxy_pass http://portal-api:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Transmettre headers oauth2-proxy pour authentification
+        proxy_set_header X-Forwarded-User $user;
+        proxy_set_header X-Forwarded-Email $email;
+        proxy_set_header X-Forwarded-Groups $groups;
+        proxy_set_header X-Forwarded-Preferred-Username $name;
+
+        # Pas de cache pour l'API
+        add_header Cache-Control "no-store, no-cache, must-revalidate" always;
+        expires off;
+    }
+
+    # Fichiers statiques du portail
+    location / {
+        try_files $uri $uri/ /index.html;
+
+        # Injecter headers dans HTML via meta tags (fallback si /api/user échoue)
+        sub_filter '</head>' '<meta name="x-forwarded-email" content="$email">
+<meta name="x-forwarded-groups" content="$groups">
+<meta name="x-forwarded-user" content="$name">
+</head>';
+        sub_filter_once on;
+        sub_filter_types text/html;
+
+        # Cache statique
+        expires 1h;
+        add_header Cache-Control "public, must-revalidate";
+    }
+
+    # Fichiers CSS/JS avec cache long
+    location ~* \.(css|js)$ {
+        expires 7d;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # Endpoints oauth2-proxy
+    location /oauth2/ {
+        proxy_pass https://oauth2-proxy:44180;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Request-Id $trace_id;
+
+        # WebSocket support si nécessaire
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+
+    # Health check (pas d'auth)
+    location /health {
+        access_log off;
+        return 200 "OK\n";
+        add_header Content-Type text/plain;
+    }
+}

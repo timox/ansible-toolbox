@@ -1,0 +1,43 @@
+---
+- name: Validate portal_api state variable
+  ansible.builtin.assert:
+    that:
+      - portal_api_state in ['present', 'absent']
+    fail_msg: "portal_api_state must be 'present' or 'absent'"
+
+- name: Ensure portal data directory exists
+  ansible.builtin.file:
+    path: "{{ data_dir }}/portal"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  when: portal_api_state == 'present'
+
+- name: Deploy Portal API via Docker Compose
+  community.docker.docker_compose_v2:
+    project_src: "{{ prod_dir }}/portal"
+    project_name: "{{ portal_api_project_name }}"
+    files:
+      - docker-compose.api.yml
+    env_files:
+      - "{{ env_file }}"
+    state: "{{ portal_api_state }}"
+  register: portal_api_deploy
+
+- name: Wait for Portal API to be healthy
+  ansible.builtin.command: >
+    docker inspect --format='{{ '{{' }}.State.Health.Status{{ '}}' }}' portal-api
+  register: portal_api_health
+  until: portal_api_health.stdout == 'healthy'
+  retries: "{{ portal_api_health_check_retries }}"
+  delay: "{{ portal_api_health_check_delay }}"
+  when:
+    - portal_api_state == 'present'
+    - not ansible_check_mode
+  changed_when: false
+  failed_when: false
+
+- name: Display Portal API deployment status
+  ansible.builtin.debug:
+    msg: "Portal API is {{ 'deployed and healthy' if portal_api_state == 'present' else 'removed' }}"

@@ -1,0 +1,31 @@
+---
+# =============================================================================
+# oauth2_proxy Role - Metadata
+# =============================================================================
+
+galaxy_info:
+  author: Pomeguac Team
+  description: Deploy oauth2-proxy authentication proxy with nginx multi-app reverse proxy
+  license: MIT
+  min_ansible_version: "2.12"
+
+  platforms:
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+    - name: Debian
+      versions:
+        - bullseye
+        - bookworm
+
+  galaxy_tags:
+    - oauth2
+    - authentication
+    - nginx
+    - reverse-proxy
+    - oidc
+    - keycloak
+
+dependencies:
+  - role: common

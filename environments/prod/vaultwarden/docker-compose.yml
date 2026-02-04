@@ -1,0 +1,156 @@
+# =============================================================================
+# OIDCWARDEN - Gestionnaire de mots de passe avec SSO avance
+# =============================================================================
+# Fork de Vaultwarden par Timshel avec fonctionnalites SSO avancees :
+# - Role mapping depuis tokens Keycloak (admin/user)
+# - Organisation mapping depuis groupes Keycloak
+# - Auto-provisioning des organisations
+#
+# Documentation:
+# - https://github.com/Timshel/OIDCWarden
+# - https://github.com/Timshel/OIDCWarden/blob/main/SSO.md
+#
+# Pourquoi OIDCWarden vs Vaultwarden :
+# - Vaultwarden 1.35+ : OIDC basique (auth uniquement)
+# - OIDCWarden : OIDC avance (role mapping, org mapping, admin via token)
+#
+# Usage :
+#   cd environments/prod/vaultwarden
+#   docker compose up -d
+# =============================================================================
+
+services:
+  vaultwarden:
+    image: timshel/oidcwarden:${OIDCWARDEN_VERSION:-latest}
+    container_name: vaultwarden
+    restart: unless-stopped
+    ports:
+      - "${VAULTWARDEN_PORT:-8222}:80"
+    volumes:
+      - vaultwarden-data:/data
+      # Bundle CA (genere par deploy.sh: systeme + /data/certs/custom-ca/*.crt)
+      - /data/certs/ca-bundle.crt:/etc/ssl/certs/ca-certificates.crt:ro
+    environment:
+      # =================================
+      # Configuration generale
+      # =================================
+      DOMAIN: "https://vault.${DOMAIN}"
+      TZ: "Europe/Paris"
+
+      # =================================
+      # Administration
+      # =================================
+      # Token pour acceder a /admin (generer avec: openssl rand -base64 48)
+      ADMIN_TOKEN: "${VAULTWARDEN_ADMIN_TOKEN}"
+
+      # =================================
+      # Inscription et invitations
+      # =================================
+      # false = inscription fermee (invitation uniquement via SSO)
+      SIGNUPS_ALLOWED: "${VAULTWARDEN_SIGNUPS_ALLOWED:-false}"
+      INVITATIONS_ALLOWED: "${VAULTWARDEN_INVITATIONS_ALLOWED:-true}"
+
+      # Domaines email autorises pour inscription (vide = tous)
+      SIGNUPS_DOMAINS_WHITELIST: ""
+
+      # =================================
+      # SSO OIDC (Keycloak) - Configuration de base
+      # =================================
+      SSO_ENABLED: "true"
+      SSO_ONLY: "${OIDCWARDEN_SSO_ONLY:-false}"
+
+      # Configuration OIDC Keycloak
+      SSO_CLIENT_ID: "${OIDCWARDEN_CLIENT_ID:-vaultwarden}"
+      SSO_CLIENT_SECRET: "${OIDCWARDEN_CLIENT_SECRET}"
+      SSO_AUTHORITY: "${KEYCLOAK_ISSUER}"
+      SSO_SCOPES: "email profile groups"
+
+      # Frontend ameliore (redirection auto vers /sso)
+      SSO_FRONTEND: "override"
+
+      # Comportement SSO
+      SSO_SIGNUPS_MATCH_EMAIL: "true"
+      SSO_ALLOW_UNKNOWN_EMAIL_VERIFICATION: "true"
+
+      # =================================
+      # OIDCWarden - Role Mapping (admin/user)
+      # =================================
+      # Mapper les roles Keycloak vers roles Vaultwarden
+      # Roles attendus dans le token: "admin" ou "user"
+      SSO_ROLES_ENABLED: "${OIDCWARDEN_ROLES_ENABLED:-true}"
+      SSO_ROLES_DEFAULT_TO_USER: "true"
+      # Chemin dans le token ID pour lire les roles
+      # Keycloak: /resource_access/vaultwarden/roles ou /realm_access/roles
+      SSO_ROLES_TOKEN_PATH: "${OIDCWARDEN_ROLES_TOKEN_PATH:-/resource_access/vaultwarden/roles}"
+
+      # =================================
+      # OIDCWarden - Organisation Mapping (groupes Keycloak)
+      # =================================
+      # Mapper les groupes Keycloak vers organisations Vaultwarden
+      SSO_ORGANIZATIONS_ENABLED: "${OIDCWARDEN_ORGS_ENABLED:-true}"
+      # Revoquer l'appartenance si groupe retire dans Keycloak
+      SSO_ORGANIZATIONS_REVOCATION: "${OIDCWARDEN_ORGS_REVOCATION:-true}"
+      # Chemin dans le token ID pour lire les groupes
+      SSO_ORGANIZATIONS_TOKEN_PATH: "${OIDCWARDEN_ORGS_TOKEN_PATH:-/groups}"
+      # Donner acces en lecture a toutes les collections existantes
+      SSO_ORGANIZATIONS_ALL_COLLECTIONS: "true"
+      # Auto-accepter les invitations
+      ORGANIZATION_INVITE_AUTO_ACCEPT: "true"
+
+      # Activer les groupes dans les organisations
+      ORG_GROUPS_ENABLED: "true"
+
+      # =================================
+      # OIDCWarden - Synchronisation
+      # =================================
+      # Resynchroniser roles/orgs au refresh du token
+      SSO_SYNC_ON_REFRESH: "true"
+
+      # =================================
+      # WebSocket (synchronisation temps reel)
+      # =================================
+      WEBSOCKET_ENABLED: "true"
+
+      # =================================
+      # Securite
+      # =================================
+      ICON_SERVICE: "internal"
+      LOG_LEVEL: "info"
+      EXTENDED_LOGGING: "true"
+
+      # =================================
+      # SMTP (optionnel - pour invitations et 2FA)
+      # =================================
+      # SMTP_HOST: "${LINSHARE_SMTP_HOST:-}"
+      # SMTP_PORT: "${LINSHARE_SMTP_PORT:-587}"
+      # SMTP_SECURITY: "starttls"
+      # SMTP_USERNAME: "${LINSHARE_SMTP_USER:-}"
+      # SMTP_PASSWORD: "${LINSHARE_SMTP_PASSWORD:-}"
+      # SMTP_FROM: "vaultwarden@${DOMAIN}"
+      # SMTP_FROM_NAME: "OIDCWarden"
+
+    networks:
+      - portal-net
+      - apps-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/alive"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  vaultwarden-data:
+    name: vaultwarden-data
+
+networks:
+  portal-net:
+    external: true
+  apps-net:
+    name: prod_apps-net
+    external: true

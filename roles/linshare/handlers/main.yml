@@ -1,0 +1,25 @@
+---
+# =============================================================================
+# LinShare Role - Handlers
+# =============================================================================
+
+- name: restart linshare backend
+  community.docker.docker_container:
+    name: linshare-backend
+    state: started
+    restart: true
+  when: linshare_state == 'present'
+
+- name: restart linshare ui user
+  community.docker.docker_container:
+    name: linshare-ui-user
+    state: started
+    restart: true
+  when: linshare_state == 'present'
+
+- name: restart linshare ui admin
+  community.docker.docker_container:
+    name: linshare-ui-admin
+    state: started
+    restart: true
+  when: linshare_state == 'present'

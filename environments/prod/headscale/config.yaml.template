@@ -1,0 +1,216 @@
+# Headscale Configuration for v0.27+
+# Documentation: https://headscale.net/stable/ref/configuration/
+# OIDC Integration: https://headscale.net/stable/ref/oidc/
+
+# =============================================================================
+# Server Configuration
+# =============================================================================
+
+# URL publique d'accès Headscale (via Kemp LoadMaster)
+server_url: https://vpn.${DOMAIN}
+
+# Adresses d'écoute
+listen_addr: 0.0.0.0:8080
+metrics_listen_addr: 0.0.0.0:9090
+
+# gRPC pour API externe (headscale CLI)
+grpc_listen_addr: 0.0.0.0:50443
+grpc_allow_insecure: false
+
+# =============================================================================
+# TLS Configuration (si exposition directe, sinon Kemp fait termination)
+# =============================================================================
+
+# Si Kemp fait TLS termination, laisser ces lignes commentées
+# tls_cert_path: /certs/wildcard.${DOMAIN}.crt
+# tls_key_path: /certs/wildcard.${DOMAIN}.key
+
+# Pour Let's Encrypt automatique (si pas de wildcard)
+# tls_letsencrypt_hostname: vpn.${DOMAIN}
+# tls_letsencrypt_cache_dir: /var/lib/headscale/cache
+# tls_letsencrypt_challenge_type: HTTP-01
+
+# =============================================================================
+# Base de données (format Headscale 0.25+)
+# =============================================================================
+
+database:
+  # Type: sqlite (recommandé) ou postgres (legacy)
+  type: sqlite
+  debug: false
+
+  # Configuration GORM (ORM Go)
+  gorm:
+    prepare_stmt: true
+    parameterized_queries: true
+    skip_err_record_not_found: true
+    slow_threshold: 1000
+
+  # SQLite (suffisant jusqu'à ~100 machines)
+  sqlite:
+    path: /var/lib/headscale/db.sqlite
+    write_ahead_log: true
+    wal_autocheckpoint: 1000
+
+  # Alternative PostgreSQL pour HA/Scale (legacy, non recommandé)
+  # postgres:
+  #   host: postgres
+  #   port: 5432
+  #   name: headscale
+  #   user: headscale
+  #   pass: ${HEADSCALE_DB_PASSWORD}
+  #   max_open_conns: 10
+  #   max_idle_conns: 10
+  #   conn_max_idle_time_secs: 3600
+
+# =============================================================================
+# Réseau VPN - Plages IP (format Headscale 0.25+)
+# =============================================================================
+
+prefixes:
+  # Plage IPv4 (CGNAT range, standard Tailscale)
+  v4: 100.64.0.0/10
+  # Plage IPv6
+  v6: fd7a:115c:a1e0::/48
+  # Mode d'allocation: sequential ou random
+  allocation: sequential
+
+# =============================================================================
+# DERP - Relay Servers (NAT traversal)
+# =============================================================================
+
+derp:
+  server:
+    # Serveur DERP embarqué (désactivé par défaut, utilise relais Tailscale)
+    enabled: false
+    region_id: 999
+    region_code: "headscale"
+    region_name: "Headscale Embedded DERP"
+    stun_listen_addr: "0.0.0.0:3478"
+    private_key_path: /var/lib/headscale/derp_server_private.key
+    automatically_add_embedded_derp_region: true
+
+  # Liste des serveurs DERP externes (gratuit, Tailscale)
+  urls:
+    - https://controlplane.tailscale.com/derpmap/default
+
+  # Chemins locaux pour DERP maps custom (optionnel)
+  paths: []
+
+  # Auto-update de la liste DERP
+  auto_update_enabled: true
+  update_frequency: 24h
+
+# =============================================================================
+# DNS Configuration - MagicDNS (format Headscale 0.25+)
+# =============================================================================
+
+dns:
+  # MagicDNS activé (résolution hostname → IP VPN)
+  magic_dns: true
+
+  # Domaine de base pour MagicDNS
+  base_domain: vpn.internal
+
+  # Serveurs DNS pour les machines VPN
+  nameservers:
+    global:
+      - 1.1.1.1      # Cloudflare
+      - 8.8.8.8      # Google
+
+    # DNS split : résolution interne pour domaines spécifiques
+    split:
+      ${DOMAIN}:
+        - 10.0.0.10  # DNS interne pour domaine principal
+
+  # Domaines de recherche
+  search_domains:
+    - ${DOMAIN}
+    - vpn.internal
+
+  # Enregistrements DNS supplémentaires (optionnel)
+  extra_records: []
+
+# =============================================================================
+# OIDC Authentication - Keycloak Integration
+# =============================================================================
+
+oidc:
+  # Ne pas démarrer si OIDC n'est pas disponible
+  only_start_if_oidc_is_available: true
+
+  # URL Keycloak OIDC (realm portal)
+  issuer: "${KEYCLOAK_ISSUER}"
+
+  # Client créé dans Keycloak
+  client_id: "headscale"
+  client_secret: "${HEADSCALE_OIDC_CLIENT_SECRET}"
+
+  # Expiration des tokens machine (180 jours)
+  expiry: 180d
+  use_expiry_from_token: false
+
+  # Scopes demandés (liste de strings)
+  scope:
+    - openid
+    - email
+    - profile
+    - groups
+
+  # Restrictions d'accès (vide = tous autorisés)
+  allowed_domains: []
+  allowed_groups: []
+  allowed_users: []
+
+  # PKCE pour sécurité additionnelle
+  pkce:
+    enabled: true
+    method: S256
+
+# =============================================================================
+# ACLs et Politique de Sécurité
+# =============================================================================
+
+# ACLs stockées en base de données (éditables via Headplane UI)
+policy:
+  mode: database
+
+# =============================================================================
+# Logging
+# =============================================================================
+
+log:
+  level: info
+  format: text
+
+# =============================================================================
+# Ephemeral Nodes (machines temporaires)
+# =============================================================================
+
+# Durée avant suppression auto des machines éphémères
+ephemeral_node_inactivity_timeout: 30m
+
+# =============================================================================
+# Divers
+# =============================================================================
+
+# Désactiver vérification mises à jour (optionnel)
+disable_check_updates: true
+
+# Randomize client port (sécurité additionnelle)
+randomize_client_port: true
+
+# =============================================================================
+# Noise Protocol (Tailscale v2) - Requis depuis Headscale 0.23+
+# =============================================================================
+
+noise:
+  # Clé privée pour le protocole Noise (Tailscale v2)
+  private_key_path: /var/lib/headscale/noise_private.key
+
+# =============================================================================
+# Unix Socket (pour headscale CLI local)
+# =============================================================================
+
+unix_socket: /var/run/headscale/headscale.sock
+unix_socket_permission: "0770"

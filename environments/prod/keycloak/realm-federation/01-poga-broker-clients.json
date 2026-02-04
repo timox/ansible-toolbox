@@ -1,0 +1,62 @@
+{
+  "_comment": "=== FICHIER 1/3 === À AJOUTER DANS LE REALM POGA (central) ===",
+  "_instructions": [
+    "1. Aller dans Keycloak Admin → Realm POGA",
+    "2. Client scopes → Create client scope 'groups' (si absent)",
+    "3. Clients → Create client pour chaque broker ci-dessous",
+    "4. Pour chaque client: ajouter le scope 'groups' dans Client scopes"
+  ],
+
+  "client_scope_groups": {
+    "_comment": "Créer ce client scope si absent dans POGA",
+    "name": "groups",
+    "protocol": "openid-connect",
+    "mapper": {
+      "name": "groups",
+      "protocol": "openid-connect",
+      "protocolMapper": "oidc-group-membership-mapper",
+      "config": {
+        "full.path": "false",
+        "id.token.claim": "true",
+        "access.token.claim": "true",
+        "claim.name": "groups",
+        "userinfo.token.claim": "true"
+      }
+    }
+  },
+
+  "clients": [
+    {
+      "_comment": "Client broker pour le realm 'oidc' (guacamole, matrix, nextcloud...)",
+      "clientId": "oidc-broker",
+      "name": "Broker vers Realm OIDC",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "REMPLACER_PAR_SECRET_GENERE",
+      "redirectUris": [
+        "https://kc.sdis25.fr/realms/oidc/broker/poga-idp/endpoint/*"
+      ],
+      "webOrigins": ["https://kc.sdis25.fr"],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "publicClient": false,
+      "defaultClientScopes": ["profile", "email", "groups"]
+    },
+    {
+      "_comment": "Client broker pour le realm 'BookStack' (wiki, wiki-test)",
+      "clientId": "bookstack-broker",
+      "name": "Broker vers Realm BookStack",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "REMPLACER_PAR_SECRET_GENERE",
+      "redirectUris": [
+        "https://kc.sdis25.fr/realms/BookStack/broker/poga-idp/endpoint/*"
+      ],
+      "webOrigins": ["https://kc.sdis25.fr"],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "publicClient": false,
+      "defaultClientScopes": ["profile", "email", "groups"]
+    }
+  ]
+}

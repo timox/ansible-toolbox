@@ -1,0 +1,25 @@
+---
+# =============================================================================
+# oauth2_proxy Role - Handlers
+# =============================================================================
+# Event-triggered tasks for restarting/reloading services
+
+- name: restart oauth2-proxy
+  community.docker.docker_container:
+    name: "{{ oauth2_proxy_container_name }}"
+    state: started
+    restart: true
+  throttle: 1
+
+- name: reload nginx-apps
+  ansible.builtin.command:
+    cmd: docker exec {{ oauth2_proxy_nginx_container_name }} nginx -s reload
+  changed_when: true
+  failed_when: false
+
+- name: restart nginx-apps
+  community.docker.docker_container:
+    name: "{{ oauth2_proxy_nginx_container_name }}"
+    state: started
+    restart: true
+  throttle: 1

@@ -1,0 +1,22 @@
+---
+# =============================================================================
+# Headscale Role - Main Tasks
+# =============================================================================
+
+- name: Include OS-specific variables
+  ansible.builtin.include_vars: "{{ ansible_os_family }}.yml"
+  failed_when: false
+
+- name: Validate headscale state variable
+  ansible.builtin.assert:
+    that:
+      - headscale_state in ['present', 'absent']
+    fail_msg: "headscale_state must be 'present' or 'absent'"
+
+- name: Deploy Headscale
+  ansible.builtin.include_tasks: deploy.yml
+  when: headscale_state == 'present'
+
+- name: Remove Headscale
+  ansible.builtin.include_tasks: remove.yml
+  when: headscale_state == 'absent'

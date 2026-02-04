@@ -1,0 +1,71 @@
+---
+# =============================================================================
+# LinShare Role - Default Variables
+# =============================================================================
+# These variables can be overridden in group_vars or host_vars
+
+# Deployment control
+linshare_state: present
+
+# Version
+linshare_version: "6.0"
+
+# OIDC Configuration
+linshare_oidc_client_id: linshare
+
+# Admin credentials for API configuration
+linshare_admin_user: "root@localhost.localdomain"
+linshare_admin_password: adminlinshare
+linshare_admin_email: "admin@{{ domain }}"
+
+# Database
+linshare_postgres_host: linshare-db
+linshare_postgres_port: 5432
+linshare_postgres_database: linshare
+linshare_postgres_user: linshare
+
+# MongoDB
+linshare_mongodb_host: linshare-mongodb
+linshare_mongodb_port: 27017
+linshare_mongodb_database: linshare
+linshare_mongodb_user: linshare
+linshare_mongodb_auth_source: linshare
+
+# Storage limits
+linshare_max_file_size: 104857600  # 100MB
+linshare_quota_default: 10737418240  # 10GB
+
+# Service ports
+linshare_user_port: 8082
+linshare_admin_port: 8083
+
+# SMTP Configuration
+linshare_smtp_host: "smtp.{{ domain }}"
+linshare_smtp_port: 587
+linshare_smtp_user: ""
+linshare_smtp_password: ""
+linshare_smtp_from: "noreply@{{ domain }}"
+linshare_smtp_tls: true
+linshare_smtp_auth: true
+
+# Antivirus
+linshare_clamav_host: linshare-antivirus
+linshare_clamav_port: 3310
+
+# Thumbnail service
+linshare_thumbnail_host: linshare-thumbnail
+linshare_thumbnail_port: 8080
+
+# API Configuration timeout
+linshare_api_wait_timeout: 60
+linshare_api_retry_delay: 2
+
+# Paths
+linshare_config_dir: "{{ data_dir }}/linshare/config"
+linshare_data_dir: "{{ data_dir }}/linshare"
+linshare_certs_dir: "{{ data_dir }}/linshare/certs"
+linshare_compose_file: "{{ prod_dir }}/linshare/docker-compose.linshare.yml"
+linshare_templates_dir: "{{ prod_dir }}/linshare/config"
+
+# Docker compose project
+linshare_project_name: "{{ ansible_user_id | default('prod') }}"

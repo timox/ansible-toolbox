@@ -1,0 +1,21 @@
+---
+# =============================================================================
+# DOCKER_APP - Restart Container (reusable task)
+# =============================================================================
+# Include this task file to restart a specific container.
+#
+# Required variable:
+#   restart_container_name: name of the Docker container to restart
+#
+# Usage:
+#   - name: Restart my container
+#     ansible.builtin.include_tasks:
+#       file: "{{ role_path }}/../docker_app/tasks/restart_container.yml"
+#     vars:
+#       restart_container_name: my-container
+
+- name: Restart container {{ restart_container_name }}
+  community.docker.docker_container:
+    name: "{{ restart_container_name }}"
+    state: started
+    restart: true

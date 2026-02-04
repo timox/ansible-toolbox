@@ -1,0 +1,64 @@
+---
+# =============================================================================
+# Role keycloak - Deploy Keycloak via Docker Compose
+# =============================================================================
+
+- name: Ensure keycloak-net network exists
+  community.docker.docker_network:
+    name: keycloak-net
+    driver: bridge
+    state: present
+  tags:
+    - keycloak-network
+
+- name: Ensure Keycloak data directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ data_dir }}/certs"
+    - "{{ keycloak_compose_project_src }}/realm-federation"
+  tags:
+    - keycloak-dirs
+
+- name: Check if certificates exist
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  register: keycloak_cert_check
+  loop:
+    - "{{ data_dir }}/certs/tls.crt"
+    - "{{ data_dir }}/certs/tls.key"
+  tags:
+    - keycloak-certs
+
+- name: Validate certificates are present
+  ansible.builtin.assert:
+    that:
+      - keycloak_cert_check.results[0].stat.exists
+      - keycloak_cert_check.results[1].stat.exists
+    fail_msg: "TLS certificates not found in {{ data_dir }}/certs/ (tls.crt, tls.key)"
+  tags:
+    - keycloak-certs
+
+- name: Deploy Keycloak using docker compose
+  community.docker.docker_compose_v2:
+    project_src: "{{ keycloak_compose_project_src }}"
+    project_name: keycloak
+    files:
+      - "{{ keycloak_compose_file }}"
+    env_files:
+      - "{{ keycloak_compose_env_file }}"
+    state: present
+    pull: missing
+  register: keycloak_deploy_result
+  notify: keycloak deployed
+  tags:
+    - keycloak-compose
+
+- name: Display Keycloak deployment result
+  ansible.builtin.debug:
+    msg: "Keycloak deployed successfully. Services: {{ keycloak_deploy_result.containers | map(attribute='Name') | list }}"
+  when: keycloak_deploy_result.changed
+  tags:
+    - keycloak-compose

@@ -1,0 +1,146 @@
+---
+# =============================================================================
+# LinShare - Configure OIDC Domain via API
+# =============================================================================
+# LinShare requires an OIDC User Provider configured in the admin interface
+# to associate OIDC users with a domain using domainDiscriminator.
+
+- name: Wait for LinShare API to be ready
+  ansible.builtin.uri:
+    url: "http://localhost:8080/linshare/webservice/rest/admin/v5/domains"
+    method: GET
+    user: "{{ linshare_admin_user }}"
+    password: "{{ linshare_admin_password }}"
+    force_basic_auth: true
+    status_code: [200, 401]
+  register: api_check
+  until: api_check.status == 200
+  retries: "{{ linshare_api_wait_timeout }}"
+  delay: "{{ linshare_api_retry_delay }}"
+  changed_when: false
+
+- name: Get existing domains
+  ansible.builtin.uri:
+    url: "http://localhost:8080/linshare/webservice/rest/admin/v5/domains"
+    method: GET
+    user: "{{ linshare_admin_user }}"
+    password: "{{ linshare_admin_password }}"
+    force_basic_auth: true
+    return_content: true
+  register: existing_domains
+  changed_when: false
+
+- name: Extract domain UUID if exists
+  ansible.builtin.set_fact:
+    linshare_domain_uuid: "{{ existing_domains.json | selectattr('name', 'equalto', domain) | map(attribute='uuid') | first | default('') }}"
+
+- name: Get root domain UUID
+  ansible.builtin.set_fact:
+    linshare_root_uuid: "{{ existing_domains.json | selectattr('type', 'equalto', 'ROOTDOMAIN') | map(attribute='uuid') | first }}"
+  when: linshare_domain_uuid == ''
+
+- name: Create LinShare TOPDOMAIN
+  ansible.builtin.uri:
+    url: "http://localhost:8080/linshare/webservice/rest/admin/v5/domains"
+    method: POST
+    user: "{{ linshare_admin_user }}"
+    password: "{{ linshare_admin_password }}"
+    force_basic_auth: true
+    body_format: json
+    body:
+      name: "{{ domain }}"
+      type: TOPDOMAIN
+      description: "OIDC domain for {{ domain }}"
+      parent:
+        uuid: "{{ linshare_root_uuid }}"
+    status_code: [200, 201, 409]
+    return_content: true
+  register: create_domain_result
+  changed_when: create_domain_result.status in [200, 201]
+  when: linshare_domain_uuid == ''
+
+- name: Set domain UUID from creation result
+  ansible.builtin.set_fact:
+    linshare_domain_uuid: "{{ create_domain_result.json.uuid }}"
+  when:
+    - linshare_domain_uuid == ''
+    - create_domain_result.status in [200, 201]
+
+- name: Get existing user providers for domain
+  ansible.builtin.uri:
+    url: "http://localhost:8080/linshare/webservice/rest/admin/v5/domains/{{ linshare_domain_uuid }}/user_providers"
+    method: GET
+    user: "{{ linshare_admin_user }}"
+    password: "{{ linshare_admin_password }}"
+    force_basic_auth: true
+    return_content: true
+  register: existing_providers
+  changed_when: false
+  when: linshare_domain_uuid != ''
+
+- name: Check if OIDC provider exists
+  ansible.builtin.set_fact:
+    oidc_provider_exists: "{{ existing_providers.content | regex_search('\"type\":\"OIDC_PROVIDER\"') is not none }}"
+  when: linshare_domain_uuid != ''
+
+- name: Extract OIDC provider UUID
+  ansible.builtin.shell: |
+    set -euo pipefail
+    echo '{{ existing_providers.content }}' | grep -o '"uuid":"[^"]*"' | head -1 | sed 's/"uuid":"//;s/"$//'
+  args:
+    executable: /bin/bash
+  register: provider_uuid_extraction
+  changed_when: false
+  when:
+    - linshare_domain_uuid != ''
+    - oidc_provider_exists
+
+- name: Create OIDC User Provider
+  ansible.builtin.uri:
+    url: "http://localhost:8080/linshare/webservice/rest/admin/v5/domains/{{ linshare_domain_uuid }}/user_providers"
+    method: POST
+    user: "{{ linshare_admin_user }}"
+    password: "{{ linshare_admin_password }}"
+    force_basic_auth: true
+    body_format: json
+    body:
+      type: OIDC_PROVIDER
+      domainDiscriminator: "{{ domain }}"
+      checkExternalUserID: false
+      useAccessClaim: false
+      useRoleClaim: false
+      useEmailLocaleClaim: false
+    status_code: [200, 201, 409]
+    return_content: true
+  register: create_provider_result
+  changed_when: create_provider_result.status in [200, 201]
+  when:
+    - linshare_domain_uuid != ''
+    - not oidc_provider_exists
+
+- name: Update OIDC User Provider
+  ansible.builtin.uri:
+    url: "http://localhost:8080/linshare/webservice/rest/admin/v5/domains/{{ linshare_domain_uuid }}/user_providers/{{ provider_uuid_extraction.stdout }}"
+    method: PUT
+    user: "{{ linshare_admin_user }}"
+    password: "{{ linshare_admin_password }}"
+    force_basic_auth: true
+    body_format: json
+    body:
+      type: OIDC_PROVIDER
+      uuid: "{{ provider_uuid_extraction.stdout }}"
+      domain:
+        uuid: "{{ linshare_domain_uuid }}"
+      domainDiscriminator: "{{ domain }}"
+      checkExternalUserID: false
+      useAccessClaim: false
+      useRoleClaim: false
+      useEmailLocaleClaim: false
+    status_code: [200, 201]
+    return_content: true
+  register: update_provider_result
+  changed_when: update_provider_result.status in [200, 201]
+  when:
+    - linshare_domain_uuid != ''
+    - oidc_provider_exists
+    - provider_uuid_extraction.stdout is defined

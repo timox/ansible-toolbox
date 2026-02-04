@@ -1,0 +1,7 @@
+---
+- name: Deploy Credentials API
+  ansible.builtin.include_tasks: deploy.yml
+  when: deploy_credentials_api | bool
+  tags:
+    - credentials-api
+    - credentials-api-deploy

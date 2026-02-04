@@ -1,0 +1,131 @@
+# Headplane Configuration
+# Documentation: https://headplane.net
+# Feature-complete Web UI for Headscale with OIDC support
+
+# =============================================================================
+# Server Configuration
+# =============================================================================
+
+server:
+  # Listen address for Headplane web UI
+  host: "0.0.0.0"
+  port: 3000
+
+  # Cookie secret for session management (minimum 32 characters)
+  # Generate with: openssl rand -base64 32
+  cookie_secret: "${HEADPLANE_COOKIE_SECRET}"
+
+  # Use secure cookies (set true when behind HTTPS reverse proxy)
+  cookie_secure: true
+
+  # Session duration in seconds (default: 24 hours)
+  session_max_age: 86400
+
+  # Data directory for Headplane database and cache
+  data_dir: "/var/lib/headplane"
+
+# =============================================================================
+# Headscale Integration
+# =============================================================================
+
+headscale:
+  # URL to Headscale HTTP API (internal container network)
+  url: "http://headscale:8080"
+
+  # Path to Headscale configuration file (mounted in container)
+  # Enables config viewing/editing in UI
+  config_path: "/etc/headscale/config.yaml"
+
+  # Public URL for display purposes (what users see)
+  public_url: "https://vpn.${DOMAIN}"
+
+  # Enable strict validation of Headscale responses
+  config_strict: true
+
+# =============================================================================
+# Integration Mode
+# =============================================================================
+
+# Choose ONE integration method:
+
+# Option 1: Docker integration (recommended for Docker deployments)
+integration:
+  docker:
+    enabled: true
+    # Headscale container name
+    container: "headscale"
+    # Docker socket path
+    socket: "/var/run/docker.sock"
+
+# Option 2: Agent integration (alternative)
+# integration:
+#   agent:
+#     enabled: true
+#     # Pre-auth key for agent node
+#     auth_key: "${HEADPLANE_AGENT_KEY}"
+#     # Cache TTL for node information
+#     cache_ttl: 300
+
+# =============================================================================
+# OIDC Authentication (Keycloak)
+# =============================================================================
+
+oidc:
+  # Enable OIDC authentication
+  enabled: true
+
+  # Headscale API Key (required for OIDC to work)
+  # Generate with: docker exec headscale headscale apikeys create --expiration 365d
+  headscale_api_key: "${HEADSCALE_API_KEY}"
+
+  # Keycloak OIDC issuer URL (external for token validation)
+  issuer: "${KEYCLOAK_ISSUER}"
+
+  # Client credentials (same as Headscale for unified auth)
+  client_id: "headscale"
+  client_secret: "${HEADSCALE_OIDC_CLIENT_SECRET}"
+
+  # Redirect URI after authentication
+  redirect_uri: "https://vpn.${DOMAIN}/admin/oidc/callback"
+
+  # OIDC scopes to request
+  scopes:
+    - openid
+    - email
+    - profile
+    - groups
+
+  # Use PKCE for enhanced security (recommended)
+  use_pkce: true
+
+  # Token endpoint authentication method
+  token_endpoint_auth_method: "client_secret_post"
+
+  # Manual OIDC endpoints
+  # Tous les endpoints passent par nginx (keycloak.DOMAIN:443 → keycloak:8080)
+  # Le wildcard TLS est gere par nginx, le CA bundle est dans NODE_EXTRA_CA_CERTS
+  authorization_endpoint: "https://${KEYCLOAK_HOST}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/auth"
+  token_endpoint: "https://${KEYCLOAK_HOST}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token"
+  userinfo_endpoint: "https://${KEYCLOAK_HOST}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/userinfo"
+
+  # Profile picture source: "oidc" or "gravatar"
+  profile_picture_source: "gravatar"
+
+  # Disable API key fallback when OIDC is configured
+  disable_api_key_login: false
+
+# =============================================================================
+# Access Control
+# =============================================================================
+
+# Headplane uses Headscale ACLs for authorization
+# Users must be authenticated via OIDC to access the UI
+# Admin privileges are determined by Keycloak group membership
+
+# =============================================================================
+# Logging
+# =============================================================================
+
+log:
+  level: "info"
+  format: "text"

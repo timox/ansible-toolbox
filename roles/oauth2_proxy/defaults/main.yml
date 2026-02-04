@@ -1,0 +1,71 @@
+---
+# =============================================================================
+# oauth2_proxy Role - Default Variables
+# =============================================================================
+# User-configurable defaults (lowest precedence)
+
+# Docker image versions
+oauth2_proxy_image: "quay.io/oauth2-proxy/oauth2-proxy:{{ oauth2_proxy_version }}"
+nginx_apps_image: "nginx:{{ nginx_version }}"
+redis_image: "redis:{{ redis_version }}"
+
+# Container names
+oauth2_proxy_container_name: oauth2-proxy
+oauth2_proxy_nginx_container_name: nginx-apps
+oauth2_proxy_redis_container_name: oauth2-redis
+
+# Ports
+oauth2_proxy_port_http: "{{ oauth2_proxy_http_port }}"
+oauth2_proxy_port_https: "{{ oauth2_proxy_https_port }}"
+oauth2_proxy_port_metrics: "{{ oauth2_proxy_metrics_port }}"
+oauth2_proxy_nginx_port_http: "{{ nginx_http_port }}"
+oauth2_proxy_nginx_port_https: "{{ nginx_https_port }}"
+
+# Paths
+oauth2_proxy_config_dir: "{{ prod_dir }}/oauth2-proxy"
+oauth2_proxy_config_file: "{{ oauth2_proxy_config_dir }}/oauth2-proxy.cfg"
+oauth2_proxy_nginx_conf_dir: "{{ oauth2_proxy_config_dir }}/nginx/conf.d"
+oauth2_proxy_nginx_base_conf: "{{ oauth2_proxy_config_dir }}/nginx/nginx.conf"
+oauth2_proxy_portal_web_dir: "{{ prod_dir }}/portal/www"
+
+# OAuth2 configuration
+oauth2_proxy_client_id: "{{ oidc_client_id }}"
+oauth2_proxy_redirect_url: "https://{{ portal_hostname_resolved }}/oauth2/callback"
+oauth2_proxy_cookie_domains: ".{{ domain }}"
+oauth2_proxy_cookie_secure: "true"
+oauth2_proxy_whitelist_domains: ".{{ domain }},{{ keycloak_host }}"
+
+# Feature flags for conditional nginx config generation
+oauth2_proxy_deploy_linshare: "{{ deploy_linshare | default(false) }}"
+oauth2_proxy_deploy_headscale: "{{ deploy_headscale | default(false) }}"
+oauth2_proxy_deploy_vaultwarden: "{{ deploy_vaultwarden | default(false) }}"
+oauth2_proxy_deploy_bookstack: "{{ deploy_bookstack | default(false) }}"
+
+# Docker networks
+oauth2_proxy_networks:
+  - auth-net
+  - prod_apps-net
+  - guacamole-net
+  - portal-net
+  - keycloak-net
+
+# Logging
+oauth2_proxy_log_driver: json-file
+oauth2_proxy_log_max_size: 10m
+oauth2_proxy_log_max_file: "3"
+
+# Session storage
+oauth2_proxy_session_store_type: redis
+oauth2_proxy_redis_url: "redis://{{ oauth2_proxy_redis_container_name }}:6379"
+
+# Keycloak backend URL for nginx proxy (Docker DNS, not localhost)
+# nginx-apps runs inside Docker and must use the container name
+oauth2_proxy_keycloak_upstream: "http://keycloak:{{ keycloak_http_port }}"
+
+# SSL certificates
+oauth2_proxy_ssl_insecure_skip_verify: true
+oauth2_proxy_ssl_cert: "{{ tls_cert_file }}"
+oauth2_proxy_ssl_key: "{{ tls_key_file }}"
+
+# Restart policy
+oauth2_proxy_restart_policy: unless-stopped

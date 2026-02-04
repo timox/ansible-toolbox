@@ -1,0 +1,32 @@
+---
+- name: Validate bookstack state variable
+  ansible.builtin.assert:
+    that:
+      - bookstack_state in ['present', 'absent']
+    fail_msg: "bookstack_state must be 'present' or 'absent'"
+
+- name: Deploy BookStack via Docker Compose
+  community.docker.docker_compose_v2:
+    project_src: "{{ prod_dir }}/bookstack"
+    project_name: "{{ bookstack_project_name }}"
+    env_files:
+      - "{{ env_file }}"
+    state: "{{ bookstack_state }}"
+    profiles:
+      - bookstack
+  register: bookstack_deploy
+
+- name: Wait for BookStack to be healthy
+  ansible.builtin.uri:
+    url: "http://localhost:{{ bookstack_port }}/status"
+    status_code: 200
+  register: bookstack_health
+  until: bookstack_health.status == 200
+  retries: 30
+  delay: 10
+  when: bookstack_state == 'present'
+  changed_when: false
+
+- name: Display BookStack deployment status
+  ansible.builtin.debug:
+    msg: "BookStack is {{ 'deployed and healthy' if bookstack_state == 'present' else 'removed' }}"

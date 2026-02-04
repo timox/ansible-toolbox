@@ -1,0 +1,112 @@
+{
+  "_comment": "=== FICHIER 2a/3 === À AJOUTER DANS LE REALM 'oidc' ===",
+  "_instructions": [
+    "1. Aller dans Keycloak Admin → Realm oidc",
+    "2. Identity providers → Add provider → Keycloak OpenID Connect",
+    "3. Remplir avec les valeurs ci-dessous",
+    "4. Remplacer CLIENT_SECRET par le secret du client 'oidc-broker' créé dans POGA"
+  ],
+
+  "identity_provider": {
+    "alias": "poga-idp",
+    "displayName": "Connexion POGA (SSO Central)",
+    "providerId": "keycloak-oidc",
+    "enabled": true,
+    "trustEmail": true,
+    "storeToken": true,
+    "firstBrokerLoginFlowAlias": "first broker login",
+
+    "config": {
+      "authorizationUrl": "https://kc.sdis25.fr/realms/POGA/protocol/openid-connect/auth",
+      "tokenUrl": "https://kc.sdis25.fr/realms/POGA/protocol/openid-connect/token",
+      "logoutUrl": "https://kc.sdis25.fr/realms/POGA/protocol/openid-connect/logout",
+      "userInfoUrl": "https://kc.sdis25.fr/realms/POGA/protocol/openid-connect/userinfo",
+      "jwksUrl": "https://kc.sdis25.fr/realms/POGA/protocol/openid-connect/certs",
+      "issuer": "https://kc.sdis25.fr/realms/POGA",
+
+      "clientId": "oidc-broker",
+      "clientSecret": "REMPLACER_PAR_SECRET_DU_CLIENT_OIDC_BROKER",
+      "clientAuthMethod": "client_secret_post",
+
+      "defaultScope": "openid email profile groups",
+      "syncMode": "FORCE",
+      "validateSignature": "true",
+      "useJwksUrl": "true"
+    }
+  },
+
+  "mappers": [
+    {
+      "name": "username",
+      "identityProviderMapper": "oidc-username-idp-mapper",
+      "config": {
+        "syncMode": "FORCE",
+        "template": "${CLAIM.preferred_username}"
+      }
+    },
+    {
+      "name": "email",
+      "identityProviderMapper": "oidc-user-attribute-idp-mapper",
+      "config": {
+        "syncMode": "FORCE",
+        "claim": "email",
+        "user.attribute": "email"
+      }
+    },
+    {
+      "name": "firstName",
+      "identityProviderMapper": "oidc-user-attribute-idp-mapper",
+      "config": {
+        "syncMode": "FORCE",
+        "claim": "given_name",
+        "user.attribute": "firstName"
+      }
+    },
+    {
+      "name": "lastName",
+      "identityProviderMapper": "oidc-user-attribute-idp-mapper",
+      "config": {
+        "syncMode": "FORCE",
+        "claim": "family_name",
+        "user.attribute": "lastName"
+      }
+    }
+  ],
+
+  "group_mappers": {
+    "_comment": "Ajouter un mapper par groupe à synchroniser",
+    "_instructions": "Pour chaque groupe: Identity providers → poga-idp → Mappers → Add mapper",
+    "examples": [
+      {
+        "name": "group-admin-infra",
+        "identityProviderMapper": "oidc-advanced-group-idp-mapper",
+        "config": {
+          "syncMode": "FORCE",
+          "claims": "[{\"key\":\"groups\",\"value\":\"admin-infra\"}]",
+          "group": "/admin-infra"
+        }
+      },
+      {
+        "name": "group-guacamole-users",
+        "identityProviderMapper": "oidc-advanced-group-idp-mapper",
+        "config": {
+          "syncMode": "FORCE",
+          "claims": "[{\"key\":\"groups\",\"value\":\"guacamole-users\"}]",
+          "group": "/guacamole-users"
+        }
+      }
+    ]
+  },
+
+  "groups_to_create": {
+    "_comment": "Créer ces groupes dans le realm oidc: Groups → Create group",
+    "groups": [
+      "/admin-infra",
+      "/admin-standard",
+      "/users",
+      "/guacamole-users",
+      "/matrix-users",
+      "/nextcloud-users"
+    ]
+  }
+}

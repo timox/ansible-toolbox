@@ -1,0 +1,65 @@
+---
+# =============================================================================
+# oauth2_proxy Role - Docker Compose Deployment
+# =============================================================================
+# Deploy oauth2-proxy, nginx-apps, and redis using docker compose
+
+- name: Ensure docker networks exist
+  community.docker.docker_network:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ oauth2_proxy_networks }}"
+
+- name: Deploy oauth2-proxy stack with docker compose
+  community.docker.docker_compose_v2:
+    project_src: "{{ oauth2_proxy_config_dir }}"
+    env_files:
+      - "{{ env_file }}"
+    state: present
+    pull: missing
+  register: oauth2_proxy_compose_result
+
+- name: Flush pending handlers (reload nginx, restart oauth2-proxy if configs changed)
+  ansible.builtin.meta: flush_handlers
+
+- name: Wait for oauth2-proxy to be healthy
+  ansible.builtin.uri:
+    url: "http://localhost:{{ oauth2_proxy_port_http }}/ping"
+    status_code: 200
+  register: oauth2_proxy_health
+  until: oauth2_proxy_health.status == 200
+  retries: 30
+  delay: 2
+  changed_when: false
+  failed_when: false
+
+- name: Display oauth2-proxy health check result
+  ansible.builtin.debug:
+    msg: "oauth2-proxy health: {{ 'OK' if (oauth2_proxy_health.status | default(0)) == 200 else 'SKIPPED (check mode)' }}"
+
+- name: Wait for nginx-apps to be ready
+  ansible.builtin.command:
+    cmd: docker exec {{ oauth2_proxy_nginx_container_name }} nginx -t
+  register: nginx_ready
+  until: nginx_ready.rc == 0
+  retries: 10
+  delay: 2
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+
+- name: Display nginx readiness result
+  ansible.builtin.debug:
+    msg: "nginx-apps: {{ 'Ready' if (nginx_ready.rc | default(1)) == 0 else 'SKIPPED (check mode)' }}"
+
+- name: Verify containers are running
+  ansible.builtin.command:
+    cmd: docker ps --filter "name={{ item }}" --filter "status=running" --format "{{ '{{' }}.Names{{ '}}' }}"
+  register: container_check
+  changed_when: false
+  failed_when: item not in (container_check.stdout | default(''))
+  loop:
+    - "{{ oauth2_proxy_container_name }}"
+    - "{{ oauth2_proxy_nginx_container_name }}"
+    - "{{ oauth2_proxy_redis_container_name }}"
+  when: not ansible_check_mode

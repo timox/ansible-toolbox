@@ -1,0 +1,8 @@
+-- Script d'initialisation PostgreSQL pour Guacamole
+-- Ce fichier sera remplacé par le schéma officiel au déploiement
+--
+-- Le script deploy.sh télécharge automatiquement le schéma depuis :
+-- docker run --rm guacamole/guacamole:VERSION /opt/guacamole/bin/initdb.sh --postgresql
+--
+-- L'utilisateur et la base sont créés automatiquement par PostgreSQL
+-- via les variables POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB du docker-compose.yml

@@ -1,0 +1,21 @@
+---
+# =============================================================================
+# LinShare Role - Metadata
+# =============================================================================
+
+galaxy_info:
+  author: Portail Securise Team
+  description: Deploy and configure LinShare file sharing with OIDC authentication
+  license: MIT
+  min_ansible_version: "2.12"
+  platforms:
+    - name: Debian
+      versions:
+        - bullseye
+        - bookworm
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+
+dependencies: []

@@ -1,0 +1,15 @@
+# =============================================================================
+# Structure organisationnelle
+# =============================================================================
+
+# OU pour les utilisateurs
+dn: ou=users,dc=poc,dc=local
+objectClass: organizationalUnit
+ou: users
+description: Utilisateurs de test
+
+# OU pour les groupes
+dn: ou=groups,dc=poc,dc=local
+objectClass: organizationalUnit
+ou: groups
+description: Groupes de securite

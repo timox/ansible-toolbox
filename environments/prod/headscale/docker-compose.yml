@@ -1,0 +1,114 @@
+# Docker Compose - Headscale VPN Mesh
+# Alternative open-source à Tailscale avec authentification Keycloak
+# Documentation: https://github.com/juanfont/headscale
+# Web UI: https://github.com/tale/headplane
+
+services:
+  headscale:
+    image: headscale/headscale:${HEADSCALE_VERSION:-0.27.1}
+    container_name: headscale
+    hostname: headscale
+    profiles: ["headscale"]
+    ports:
+      # API HTTP (interne uniquement) - Port 8085 car 8080 utilisé par Keycloak
+      - "127.0.0.1:8085:8080"
+      # Metrics Prometheus
+      - "${HEADSCALE_METRICS_PORT:-9091}:9090"
+      # gRPC (pour headscale CLI externe)
+      - "127.0.0.1:50443:50443"
+    volumes:
+      # Configuration Headscale (template généré par deploy)
+      - ./config.yaml:/etc/headscale/config.yaml:ro
+      # ACLs en mode database (éditables via Headplane UI)
+      # Données persistantes (DB SQLite, machines enregistrées)
+      - /data/headscale/data:/var/lib/headscale
+      # Socket unix pour CLI
+      - /data/headscale/run:/var/run/headscale
+      # Certificats TLS (si exposition directe, sinon Kemp fait TLS termination)
+      - /data/certs:/certs:ro
+      # CA bundle pour validation certificats internes (POC/self-signed)
+      - /data/certs/ca-bundle.crt:/etc/ssl/certs/ca-certificates.crt:ro
+    command: serve
+    restart: unless-stopped
+    networks:
+      - headscale-net
+      - apps-net  # Accès aux services internes
+      - keycloak-net  # Accès à Keycloak pour OIDC
+    # Healthcheck désactivé - image minimale sans wget/curl
+    # Vérifier manuellement: curl http://localhost:9091/metrics
+    healthcheck:
+      disable: true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+
+  # Headplane : Interface web complète avec OIDC
+  # Documentation: https://headplane.net
+  headplane:
+    image: ghcr.io/tale/headplane:${HEADPLANE_VERSION:-latest}
+    container_name: headplane
+    ports:
+      - "${HEADPLANE_PORT:-3000}:3000"
+    volumes:
+      # Configuration Headplane
+      - ./headplane.yaml:/etc/headplane/config.yaml:ro
+      # Accès à la config Headscale (lecture seule, pour affichage dans UI)
+      - ./config.yaml:/etc/headscale/config.yaml:ro
+      # Docker socket pour intégration Docker
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Données persistantes Headplane
+      - /data/headplane:/var/lib/headplane
+      # CA bundle pour validation certificats internes (self-signed)
+      - /data/certs/ca-bundle.crt:/etc/ssl/certs/ca-certificates.crt:ro
+    environment:
+      - TZ=${TZ:-Europe/Paris}
+      # Node.js doit faire confiance au CA self-signed pour OIDC HTTPS
+      - NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
+    depends_on:
+      headscale:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - headscale-net
+      - apps-net  # Permet à nginx de router vers headscale-ui
+      - keycloak-net  # Accès à Keycloak pour OIDC
+    profiles:
+      - headscale  # Activé avec DEPLOY_HEADSCALE=true
+    # Image distroless - pas d'outil pour healthcheck
+    healthcheck:
+      disable: true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 64M
+
+networks:
+  headscale-net:
+    external: true
+  # Réseau partagé avec autres services (créé par deploy.sh)
+  apps-net:
+    name: prod_apps-net
+    external: true
+  # Réseau Keycloak pour OIDC
+  keycloak-net:
+    external: true

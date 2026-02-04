@@ -1,0 +1,73 @@
+---
+# =============================================================================
+# oauth2_proxy Role - Manage Nginx Conditional Configs
+# =============================================================================
+# Generate or remove nginx configs for optional services based on deploy flags
+
+- name: Generate LinShare nginx config
+  ansible.builtin.template:
+    src: linshare.conf.j2
+    dest: "{{ oauth2_proxy_nginx_conf_dir }}/linshare.conf"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: reload nginx-apps
+  when: oauth2_proxy_deploy_linshare | bool
+
+- name: Remove LinShare nginx config if disabled
+  ansible.builtin.file:
+    path: "{{ oauth2_proxy_nginx_conf_dir }}/linshare.conf"
+    state: absent
+  notify: reload nginx-apps
+  when: not (oauth2_proxy_deploy_linshare | bool)
+
+- name: Generate Headscale nginx config
+  ansible.builtin.template:
+    src: headscale.conf.j2
+    dest: "{{ oauth2_proxy_nginx_conf_dir }}/headscale.conf"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: reload nginx-apps
+  when: oauth2_proxy_deploy_headscale | bool
+
+- name: Remove Headscale nginx config if disabled
+  ansible.builtin.file:
+    path: "{{ oauth2_proxy_nginx_conf_dir }}/headscale.conf"
+    state: absent
+  notify: reload nginx-apps
+  when: not (oauth2_proxy_deploy_headscale | bool)
+
+- name: Generate Vaultwarden nginx config
+  ansible.builtin.template:
+    src: vaultwarden.conf.j2
+    dest: "{{ oauth2_proxy_nginx_conf_dir }}/vaultwarden.conf"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: reload nginx-apps
+  when: oauth2_proxy_deploy_vaultwarden | bool
+
+- name: Remove Vaultwarden nginx config if disabled
+  ansible.builtin.file:
+    path: "{{ oauth2_proxy_nginx_conf_dir }}/vaultwarden.conf"
+    state: absent
+  notify: reload nginx-apps
+  when: not (oauth2_proxy_deploy_vaultwarden | bool)
+
+- name: Generate Bookstack nginx config
+  ansible.builtin.template:
+    src: bookstack.conf.j2
+    dest: "{{ oauth2_proxy_nginx_conf_dir }}/bookstack.conf"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: reload nginx-apps
+  when: oauth2_proxy_deploy_bookstack | bool
+
+- name: Remove Bookstack nginx config if disabled
+  ansible.builtin.file:
+    path: "{{ oauth2_proxy_nginx_conf_dir }}/bookstack.conf"
+    state: absent
+  notify: reload nginx-apps
+  when: not (oauth2_proxy_deploy_bookstack | bool)

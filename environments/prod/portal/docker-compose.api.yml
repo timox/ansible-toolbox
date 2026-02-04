@@ -1,0 +1,35 @@
+# =============================================================================
+# PORTAL API - Backend pour gestion des applications du portail
+# =============================================================================
+# Inclus dans la stack principale via docker-compose.yml
+# Fournit les endpoints:
+#   - GET/POST /api/applications : Gestion des applications
+#   - GET /api/categories : Liste des categories
+#   - GET /health : Health check
+# =============================================================================
+
+services:
+  portal-api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: portal-api
+    volumes:
+      - ${DATA_DIR:-/data}/portal:/data
+    environment:
+      - DATA_DIR=/data
+    restart: unless-stopped
+    networks:
+      - portal-net
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "com.pomeguac.service=portal-api"
+      - "com.pomeguac.description=API backend portail applications"
+
+networks:
+  portal-net:
+    external: true

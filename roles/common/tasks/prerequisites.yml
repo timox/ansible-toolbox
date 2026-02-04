@@ -1,0 +1,118 @@
+---
+# =============================================================================
+# Prerequisites - Equivalent deploy.sh lines 1149-1292
+# =============================================================================
+
+# --- Docker ---
+- name: Check Docker is installed
+  ansible.builtin.command: docker --version
+  register: docker_version
+  changed_when: false
+  failed_when: docker_version.rc != 0
+
+- name: Display Docker version
+  ansible.builtin.debug:
+    msg: "Docker installed: {{ docker_version.stdout }}"
+
+# --- DATA_DIR ---
+- name: Check DATA_DIR exists
+  ansible.builtin.stat:
+    path: "{{ data_dir }}"
+  register: data_dir_stat
+
+- name: Check if DATA_DIR is a symlink
+  ansible.builtin.stat:
+    path: "{{ data_dir }}"
+    follow: false
+  register: data_dir_link
+  when: not data_dir_stat.stat.exists
+
+- name: Fail if DATA_DIR not accessible
+  ansible.builtin.fail:
+    msg: >
+      DATA_DIR not accessible: {{ data_dir }}.
+      {% if data_dir_link.stat is defined and data_dir_link.stat.islnk %}
+      Symlink target may not be mounted.
+      {% endif %}
+  when: not data_dir_stat.stat.exists
+
+# --- SSL Certificates ---
+- name: Check SSL certificate exists
+  ansible.builtin.stat:
+    path: "{{ tls_cert_file }}"
+  register: cert_stat
+
+- name: Fail if SSL certificate missing
+  ansible.builtin.fail:
+    msg: "SSL certificate missing: {{ tls_cert_file }}"
+  when: not cert_stat.stat.exists
+
+- name: Check SSL key exists
+  ansible.builtin.stat:
+    path: "{{ tls_key_file }}"
+  register: key_stat
+
+- name: Fail if SSL key missing
+  ansible.builtin.fail:
+    msg: "SSL private key missing: {{ tls_key_file }}"
+  when: not key_stat.stat.exists
+
+# --- KEYCLOAK_ISSUER ---
+- name: Fail if keycloak_issuer is empty
+  ansible.builtin.fail:
+    msg: "keycloak_issuer is not defined or empty"
+  when: keycloak_issuer | length == 0
+
+# --- Derive Keycloak variables from KEYCLOAK_ISSUER ---
+# Example: https://keycloak.example.com/realms/portal
+#   -> keycloak_host = keycloak.example.com
+#   -> keycloak_realm = portal
+#   -> keycloak_url = https://keycloak.example.com
+#   -> keycloak_backend_url = https://keycloak.example.com
+
+- name: Derive keycloak_host from issuer
+  ansible.builtin.set_fact:
+    keycloak_host: "{{ keycloak_issuer | urlsplit('hostname') }}"
+  when: keycloak_host is not defined or keycloak_host | length == 0
+
+- name: Derive keycloak_realm from issuer
+  ansible.builtin.set_fact:
+    keycloak_realm: "{{ keycloak_issuer | regex_replace('.*/realms/([^/]+).*', '\\1') }}"
+  when: keycloak_realm is not defined or keycloak_realm | length == 0
+
+- name: Derive keycloak_url from issuer
+  ansible.builtin.set_fact:
+    keycloak_url: "{{ keycloak_issuer | urlsplit('scheme') }}://{{ keycloak_issuer | urlsplit('hostname') }}{% if keycloak_issuer | urlsplit('port') %}:{{ keycloak_issuer | urlsplit('port') }}{% endif %}"
+  when: keycloak_url is not defined or keycloak_url | length == 0
+
+- name: Derive keycloak_backend_url from keycloak_url
+  ansible.builtin.set_fact:
+    keycloak_backend_url: "{{ keycloak_url }}"
+  when: keycloak_backend_url is not defined or keycloak_backend_url | length == 0
+
+- name: Display derived Keycloak variables
+  ansible.builtin.debug:
+    msg:
+      - "keycloak_host: {{ keycloak_host }}"
+      - "keycloak_realm: {{ keycloak_realm }}"
+      - "keycloak_url: {{ keycloak_url }}"
+      - "keycloak_backend_url: {{ keycloak_backend_url }}"
+
+# --- Derive service hostnames ---
+- name: Set service hostnames (defaults to <service>.domain)
+  ansible.builtin.set_fact:
+    portal_hostname_resolved: "{{ portal_hostname | default('', true) | ternary(portal_hostname, 'portail.' + domain) }}"
+    guacamole_hostname_resolved: "{{ guacamole_hostname | default('', true) | ternary(guacamole_hostname, 'guacamole.' + domain) }}"
+    vaultwarden_hostname_resolved: "{{ vaultwarden_hostname | default('', true) | ternary(vaultwarden_hostname, 'vault.' + domain) }}"
+    linshare_hostname_resolved: "{{ linshare_hostname | default('', true) | ternary(linshare_hostname, 'linshare.' + domain) }}"
+    linshare_admin_hostname_resolved: "{{ linshare_admin_hostname | default('', true) | ternary(linshare_admin_hostname, 'linshare-admin.' + domain) }}"
+    headscale_hostname_resolved: "{{ headscale_hostname | default('', true) | ternary(headscale_hostname, 'vpn.' + domain) }}"
+    bookstack_hostname_resolved: "{{ bookstack_hostname | default('', true) | ternary(bookstack_hostname, 'wiki.' + domain) }}"
+    keycloak_proxy_hostname_resolved: "{{ keycloak_proxy_hostname | default('', true) | ternary(keycloak_proxy_hostname, 'keycloak.' + domain) }}"
+
+# --- Derive oauth2-proxy variables ---
+- name: Set oauth2-proxy derived variables
+  ansible.builtin.set_fact:
+    oauth2_proxy_redirect_url: "https://{{ portal_hostname_resolved }}/oauth2/callback"
+    oauth2_proxy_cookie_domains: ".{{ domain }}"
+    oauth2_proxy_cookie_secure: true

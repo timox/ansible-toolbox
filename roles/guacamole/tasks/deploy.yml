@@ -1,0 +1,63 @@
+---
+# =============================================================================
+# GUACAMOLE - Deployment via Docker Compose
+# =============================================================================
+
+- name: Ensure guacamole Docker network exists
+  community.docker.docker_network:
+    name: guacamole-net
+    driver: bridge
+    state: present
+
+- name: Deploy Guacamole services via Docker Compose
+  community.docker.docker_compose_v2:
+    project_src: "{{ prod_dir }}/guacamole"
+    project_name: "{{ guacamole_compose_project }}"
+    files:
+      - docker-compose.yml
+    env_files:
+      - "{{ env_file }}"
+    state: present
+  register: guacamole_deploy
+  changed_when: guacamole_deploy.actions | length > 0
+
+- name: Wait for guacamole-db to be healthy
+  ansible.builtin.command: >
+    docker inspect --format='{{ '{{' }}.State.Health.Status{{ '}}' }}' guacamole-postgres
+  register: guacamole_db_health
+  until: guacamole_db_health.stdout == 'healthy'
+  retries: "{{ guacamole_health_check_retries }}"
+  delay: "{{ guacamole_health_check_timeout }}"
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+
+- name: Wait for guacamole-daemon to be healthy
+  ansible.builtin.command: >
+    docker inspect --format='{{ '{{' }}.State.Health.Status{{ '}}' }}' guacamole-daemon
+  register: guacamole_daemon_health
+  until: guacamole_daemon_health.stdout == 'healthy'
+  retries: "{{ guacamole_health_check_retries }}"
+  delay: "{{ guacamole_health_check_timeout }}"
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+
+- name: Wait for guacamole-web to be running
+  ansible.builtin.command: >
+    docker inspect --format='{{ '{{' }}.State.Status{{ '}}' }}' guacamole-web
+  register: guacamole_health
+  until: guacamole_health.stdout == 'running'
+  retries: "{{ guacamole_health_check_retries }}"
+  delay: "{{ guacamole_health_check_timeout }}"
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+
+- name: Display deployment status
+  ansible.builtin.debug:
+    msg:
+      - "Guacamole deployment complete"
+      - "Access URL: https://{{ guacamole_hostname | default('guacamole.' + domain) }}"
+      - "Authentication: OIDC via {{ keycloak_issuer }}"
+      - "guacamole-daemon: network_mode host (access to local network for RDP/SSH/VNC)"

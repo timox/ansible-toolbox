@@ -1,0 +1,45 @@
+---
+# =============================================================================
+# DOCKER_APP - Health Checks
+# =============================================================================
+# Supports three check types: docker_health, docker_running, uri.
+
+- name: Health check docker_health for {{ docker_app_name }}
+  ansible.builtin.command: >
+    docker inspect --format='{{ '{{' }}.State.Health.Status{{ '}}' }}' {{ item.container }}
+  register: _docker_app_health
+  until: _docker_app_health.stdout == 'healthy'
+  retries: "{{ item.retries | default(30) }}"
+  delay: "{{ item.delay | default(5) }}"
+  changed_when: false
+  failed_when: false
+  loop: "{{ docker_app_health_checks | selectattr('type', 'equalto', 'docker_health') | list }}"
+  loop_control:
+    label: "{{ item.container }}"
+
+- name: Health check docker_running for {{ docker_app_name }}
+  ansible.builtin.command: >
+    docker inspect --format='{{ '{{' }}.State.Status{{ '}}' }}' {{ item.container }}
+  register: _docker_app_running
+  until: _docker_app_running.stdout == 'running'
+  retries: "{{ item.retries | default(30) }}"
+  delay: "{{ item.delay | default(5) }}"
+  changed_when: false
+  failed_when: false
+  loop: "{{ docker_app_health_checks | selectattr('type', 'equalto', 'docker_running') | list }}"
+  loop_control:
+    label: "{{ item.container }}"
+
+- name: Health check uri for {{ docker_app_name }}
+  ansible.builtin.uri:
+    url: "{{ item.url }}"
+    status_code: "{{ item.status_code | default(200) }}"
+    validate_certs: "{{ item.validate_certs | default(false) }}"
+  register: _docker_app_uri
+  until: _docker_app_uri.status == (item.status_code | default(200))
+  retries: "{{ item.retries | default(30) }}"
+  delay: "{{ item.delay | default(5) }}"
+  changed_when: false
+  loop: "{{ docker_app_health_checks | selectattr('type', 'equalto', 'uri') | list }}"
+  loop_control:
+    label: "{{ item.url }}"

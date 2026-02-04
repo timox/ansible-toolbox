@@ -1,0 +1,52 @@
+---
+# =============================================================================
+# Headscale Role - Default Variables
+# =============================================================================
+# User-configurable options for Headscale VPN mesh deployment
+# Prefix all variables with headscale_ to prevent conflicts
+
+# Service state (present = deploy, absent = remove)
+headscale_state: present
+
+# Docker versions
+headscale_version: "0.27.1"
+headscale_headplane_version: "latest"
+
+# Network configuration
+headscale_https_port: 9443
+headscale_metrics_port: 9091
+headscale_headplane_port: 3000
+headscale_ui_port: 8000
+
+# Directory paths
+headscale_data_dir: "/data/headscale"
+headscale_config_dir: "{{ prod_dir }}/headscale"
+
+# Docker networks (created by prerequisites, marked external in compose)
+headscale_networks:
+  - headscale-net
+  - prod_apps-net
+  - keycloak-net
+
+# OIDC configuration
+headscale_oidc_client_id: "headscale"
+headplane_oidc_client_id: "headplane"
+
+# API key expiration for Headplane
+headscale_api_key_expiration: "365d"
+
+# Template files to process
+headscale_templates:
+  - src: config.yaml.j2
+    dest: config.yaml
+  - src: headplane.yaml.j2
+    dest: headplane.yaml
+
+# Docker Compose configuration
+headscale_compose_file: "{{ headscale_config_dir }}/docker-compose.yml"
+headscale_compose_profiles:
+  - headscale
+
+# Service dependencies
+headscale_wait_for_keycloak: true
+headscale_keycloak_timeout: 60

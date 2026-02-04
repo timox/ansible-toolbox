@@ -1,0 +1,8 @@
+---
+# =============================================================================
+# VAULTWARDEN ROLE - Defaults
+# =============================================================================
+# User-configurable defaults for Vaultwarden deployment
+
+vaultwarden_state: present
+vaultwarden_project_name: vaultwarden

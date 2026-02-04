@@ -1,0 +1,64 @@
+{
+  "domain": "{{ domain }}",
+  "keycloak": {
+    "issuer": "{{ keycloak_issuer }}",
+    "realm": "{{ keycloak_realm | default('portal') }}",
+    "clientId": "{{ oidc_client_id }}"
+  },
+  "oauth2proxy": {
+    "cookieDomain": ".{{ domain }}",
+    "sessionStore": "redis"
+  },
+  "portal": {
+    "adminGroup": "{{ portal_api_admin_group }}"
+  },
+  "vaultwarden": {
+    "enabled": {{ portal_api_vaultwarden_enabled | lower }},
+    "url": "https://vault.{{ domain }}",
+    "apiPort": 8087
+  },
+  "infrastructure": {
+    "serverIp": "{{ portal_api_poc_ip }}",
+    "dataDir": "{{ data_dir }}",
+    "services": {
+      "portal": {
+        "url": "https://{{ portal_api_portal_hostname if portal_api_portal_hostname else domain }}",
+        "httpPort": 80,
+        "httpsPort": 443
+      },
+      "guacamole": {
+        "url": "https://{{ portal_api_guacamole_hostname if portal_api_guacamole_hostname else 'guacamole.' + domain }}",
+        "httpPort": 8081,
+        "oidcClient": "{{ guacamole_oidc_client_id }}"
+      },
+      "vaultwarden": {
+        "url": "https://{{ portal_api_vaultwarden_hostname if portal_api_vaultwarden_hostname else 'vault.' + domain }}",
+        "httpPort": {{ vaultwarden_port }},
+        "oidcClient": "{{ oidcwarden_client_id }}",
+        "enabled": {{ deploy_vaultwarden | lower }}
+      },
+      "linshare": {
+        "url": "https://{{ portal_api_linshare_hostname if portal_api_linshare_hostname else 'linshare.' + domain }}",
+        "userPort": {{ linshare_user_port }},
+        "adminPort": {{ linshare_admin_port }},
+        "oidcClient": "{{ linshare_oidc_client_id }}",
+        "enabled": {{ deploy_linshare | lower }}
+      },
+      "headscale": {
+        "url": "https://{{ portal_api_headscale_hostname if portal_api_headscale_hostname else 'vpn.' + domain }}",
+        "httpsPort": {{ headscale_https_port }},
+        "enabled": {{ deploy_headscale | lower }}
+      },
+      "credentialsApi": {
+        "enabled": {{ deploy_credentials_api | lower }}
+      }
+    },
+    "groups": {
+      "adminInfra": "{{ admin_group }}",
+      "adminApp": "{{ admin_app_group }}",
+      "users": "{{ user_group }}"
+    }
+  },
+  "version": "2.0",
+  "lastUpdate": "{{ portal_api_build_date }}"
+}

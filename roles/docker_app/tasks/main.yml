@@ -1,0 +1,36 @@
+---
+# =============================================================================
+# DOCKER_APP ROLE - Main Entry Point
+# =============================================================================
+# Routes to the appropriate task files based on docker_app_state.
+# Lifecycle: validate -> directories -> configs -> deploy -> health_check
+
+- name: Validate configuration for {{ docker_app_name }}
+  ansible.builtin.include_tasks: validate.yml
+
+- name: Create directories for {{ docker_app_name }}
+  ansible.builtin.include_tasks: directories.yml
+  when:
+    - docker_app_state == 'present'
+    - docker_app_directories | length > 0
+
+- name: Generate configs from templates for {{ docker_app_name }}
+  ansible.builtin.include_tasks: configs.yml
+  when:
+    - docker_app_state == 'present'
+    - docker_app_templates | length > 0
+
+- name: Deploy via Docker Compose for {{ docker_app_name }}
+  ansible.builtin.include_tasks: deploy.yml
+  when: docker_app_state == 'present'
+
+- name: Run health checks for {{ docker_app_name }}
+  ansible.builtin.include_tasks: health_check.yml
+  when:
+    - docker_app_state == 'present'
+    - docker_app_health_checks | length > 0
+    - not ansible_check_mode
+
+- name: Remove application {{ docker_app_name }}
+  ansible.builtin.include_tasks: remove.yml
+  when: docker_app_state == 'absent'

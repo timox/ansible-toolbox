@@ -1,0 +1,99 @@
+# Configuration Guacamole avec authentification OIDC native (Keycloak)
+# Architecture simplifiee : Guacamole -> Keycloak directement (sans oauth2-proxy)
+# Genere automatiquement par Ansible
+
+# === Configuration PostgreSQL ===
+postgresql-hostname: {{ guacamole_postgres_hostname }}
+postgresql-port: {{ guacamole_postgres_port }}
+postgresql-database: {{ guacamole_db_name }}
+postgresql-username: {{ guacamole_db_user }}
+postgresql-password: {{ guacamole_db_password }}
+
+# Optimisations connexions PostgreSQL
+postgresql-max-connections: {{ guacamole_postgres_max_connections }}
+postgresql-max-connections-per-user: {{ guacamole_postgres_max_connections_per_user }}
+postgresql-absolute-max-connections: {{ guacamole_postgres_absolute_max_connections }}
+postgresql-default-max-connections: {{ guacamole_postgres_default_max_connections }}
+postgresql-default-max-group-connections: {{ guacamole_postgres_default_max_group_connections }}
+postgresql-absolute-max-group-connections: {{ guacamole_postgres_absolute_max_group_connections }}
+
+# === Configuration guacd (daemon) ===
+guacd-hostname: {{ guacamole_daemon_hostname }}
+guacd-port: {{ guacamole_daemon_port }}
+
+# === Authentification OpenID Connect (Keycloak) ===
+# Documentation : https://guacamole.apache.org/doc/gug/openid-auth.html
+#
+# Avantages vs oauth2-proxy + http-header :
+# - Connexion directe Guacamole -> Keycloak (pas de manipulation headers)
+# - Pas de probleme avec Kemp LoadMaster
+# - Standard OIDC gere nativement par Guacamole
+# - Logout SSO complet
+
+# Endpoints Keycloak (tous en HTTPS)
+openid-authorization-endpoint: {{ keycloak_issuer }}/protocol/openid-connect/auth
+openid-jwks-endpoint: {{ keycloak_issuer }}/protocol/openid-connect/certs
+openid-issuer: {{ keycloak_issuer }}
+
+# Client OIDC Guacamole (creer dans Keycloak)
+openid-client-id: {{ guacamole_oidc_client_id }}
+
+# URL de redirection apres authentification
+# IMPORTANT : Cette URL doit etre configuree dans "Valid Redirect URIs" du client Keycloak
+# Note: Doit pointer vers /guacamole/ car c'est le context path de l'application Tomcat
+openid-redirect-uri: https://{{ guacamole_hostname | default('guacamole.' + domain) }}/guacamole/
+
+# Claims utilisateur
+# preferred_username : utilise le username AD/Keycloak (pas l'email)
+openid-username-claim-type: {{ guacamole_oidc_username_claim }}
+
+# Groupes pour autorisation (optionnel, gestion fine dans Guacamole)
+openid-groups-claim-type: {{ guacamole_oidc_groups_claim }}
+
+# Scopes demandes
+openid-scope: {{ guacamole_oidc_scope }}
+
+# Tolerances
+openid-allowed-clock-skew: {{ guacamole_oidc_allowed_clock_skew }}
+openid-max-token-validity: {{ guacamole_oidc_max_token_validity }}
+openid-max-nonce-validity: {{ guacamole_oidc_max_nonce_validity }}
+
+# === WebSocket et Timeouts ===
+enable-websocket: {{ guacamole_enable_websocket | lower }}
+websocket-allow-remote: {{ guacamole_websocket_allow_remote | lower }}
+# Timeout session API : 8 heures
+api-session-timeout: {{ guacamole_api_session_timeout }}
+
+# === Enregistrements et Stockage ===
+recording-search-path: {{ guacamole_recording_path }}
+create-recording-path: {{ guacamole_create_recording_path | lower }}
+
+# === Lecteurs reseau (configuration par defaut) ===
+# IMPORTANT: Pour l'isolation par utilisateur, configurez au niveau de chaque connexion RDP:
+#   - enable-drive: true
+#   - drive-path: /drive/${GUAC_USERNAME}
+#   - drive-name: Documents
+#   - create-drive-path: true
+#
+# La variable ${GUAC_USERNAME} est remplacee par le nom d'utilisateur connecte
+# Chaque utilisateur aura son propre repertoire isole
+#
+# Valeur par defaut (si non configuree dans la connexion):
+drive-path: {{ guacamole_drive_path }}
+create-drive-path: {{ guacamole_create_drive_path | lower }}
+
+# === Interface et Langues ===
+available-languages: {{ guacamole_available_languages }}
+
+# === Securite ===
+# En cas d'indisponibilite PostgreSQL, continuer (permet demarrage)
+skip-if-unavailable: {{ guacamole_skip_if_unavailable }}
+
+# Permettre variables d'environnement dans les connexions
+allow-environment: {{ guacamole_allow_environment | lower }}
+
+# === Extensions ===
+# Ordre de priorite des extensions d'authentification
+# 1. OpenID Connect (authentification SSO via Keycloak)
+# 2. PostgreSQL (stockage utilisateurs et connexions)
+extension-priority: {{ guacamole_extension_priority }}

@@ -1,0 +1,64 @@
+---
+# =============================================================================
+# PORTAL-DESTROY.YML - Suppression d'un ou tous les services
+# =============================================================================
+# Equivalent de deploy.sh --destroy-all
+#
+# Usage:
+#   # Supprimer un service
+#   ansible-playbook playbooks/portal-destroy.yml -e service=linshare -e confirm=true
+#
+#   # Supprimer TOUS les services (DANGEREUX)
+#   ansible-playbook playbooks/portal-destroy.yml -e service=all -e confirm=true
+# =============================================================================
+
+- name: "Destroy service: {{ service | default('UNDEFINED') }}"
+  hosts: portal_servers
+  become: true
+
+  pre_tasks:
+    - name: Require explicit confirmation
+      ansible.builtin.assert:
+        that:
+          - confirm | default(false) | bool
+        fail_msg: "Destruction requires -e confirm=true"
+
+    - name: Validate service parameter
+      ansible.builtin.assert:
+        that:
+          - service is defined
+          - service in ['all', 'keycloak', 'oauth2-proxy', 'guacamole', 'credentials-api',
+                        'portal-api', 'vaultwarden', 'headscale', 'linshare', 'bookstack']
+        fail_msg: "Service '{{ service | default('UNDEFINED') }}' invalide."
+
+  tasks:
+    - name: "Destroy {{ service }}"
+      ansible.builtin.include_role:
+        name: "{{ item.role }}"
+      vars:
+        "{{ item.state_var }}": absent
+      loop: "{{ destroy_targets }}"
+      loop_control:
+        label: "{{ item.role }}"
+      vars:
+        all_services:
+          - { role: bookstack, state_var: bookstack_state }
+          - { role: linshare, state_var: linshare_state }
+          - { role: headscale, state_var: headscale_state }
+          - { role: vaultwarden, state_var: vaultwarden_state }
+          - { role: portal_api, state_var: portal_api_state }
+          - { role: credentials_api, state_var: credentials_api_state }
+          - { role: guacamole, state_var: guacamole_state }
+          - { role: oauth2_proxy, state_var: oauth2_proxy_state }
+          - { role: keycloak, state_var: keycloak_state }
+        single_service_map:
+          keycloak: [{ role: keycloak, state_var: keycloak_state }]
+          oauth2-proxy: [{ role: oauth2_proxy, state_var: oauth2_proxy_state }]
+          guacamole: [{ role: guacamole, state_var: guacamole_state }]
+          credentials-api: [{ role: credentials_api, state_var: credentials_api_state }]
+          portal-api: [{ role: portal_api, state_var: portal_api_state }]
+          vaultwarden: [{ role: vaultwarden, state_var: vaultwarden_state }]
+          headscale: [{ role: headscale, state_var: headscale_state }]
+          linshare: [{ role: linshare, state_var: linshare_state }]
+          bookstack: [{ role: bookstack, state_var: bookstack_state }]
+        destroy_targets: "{{ all_services if service == 'all' else single_service_map[service] }}"

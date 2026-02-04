@@ -1,0 +1,19 @@
+---
+# =============================================================================
+# LinShare Role - Main Tasks
+# =============================================================================
+
+- name: Include generate_configs tasks
+  ansible.builtin.include_tasks: generate_configs.yml
+  when: linshare_state == 'present'
+
+- name: Include generate_truststore tasks
+  ansible.builtin.include_tasks: generate_truststore.yml
+  when: linshare_state == 'present'
+
+- name: Include deploy tasks
+  ansible.builtin.include_tasks: deploy.yml
+
+- name: Include configure_oidc tasks
+  ansible.builtin.include_tasks: configure_oidc.yml
+  when: linshare_state == 'present'

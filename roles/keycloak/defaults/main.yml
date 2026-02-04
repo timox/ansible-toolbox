@@ -1,0 +1,40 @@
+---
+# =============================================================================
+# Role keycloak - Valeurs par defaut
+# =============================================================================
+# Variables configurables pour le deploiement de Keycloak
+
+# Etat du service Keycloak
+keycloak_state: present  # present ou absent
+
+# Timeout pour attendre la disponibilite de Keycloak (secondes)
+keycloak_readiness_timeout: 300
+
+# Intervalle entre les tentatives de verification (secondes)
+keycloak_readiness_delay: 10
+
+# Retries pour la verification de readiness
+keycloak_readiness_retries: 30
+
+# Keycloak OIDC issuer (doit etre defini dans group_vars)
+keycloak_issuer: ""
+
+# Keycloak backend URL pour les checks de sante
+keycloak_backend_url: "{{ keycloak_host_backend_url | default('http://localhost:8080') }}"
+
+# Ports Keycloak
+keycloak_http_port: 8080
+keycloak_https_port: 8443
+
+# Chemins Docker Compose
+keycloak_compose_project_src: "{{ prod_dir }}/keycloak"
+keycloak_compose_file: docker-compose.yml
+keycloak_compose_env_file: "{{ prod_dir }}/.env"
+
+# Variables d'environnement pour Docker Compose
+keycloak_compose_env:
+  KEYCLOAK_ADMIN: "{{ keycloak_admin }}"
+  KEYCLOAK_ADMIN_PASSWORD: "{{ vault_keycloak_admin_password }}"
+  KEYCLOAK_DB_PASSWORD: "{{ vault_keycloak_db_password }}"
+  DOMAIN: "{{ domain }}"
+  DATA_DIR: "{{ data_dir }}"

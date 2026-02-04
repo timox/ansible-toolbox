@@ -1,0 +1,20 @@
+---
+# =============================================================================
+# DOCKER_APP - Configuration Generation
+# =============================================================================
+# Renders templates listed in docker_app_templates.
+# Each template can optionally notify a handler on change.
+
+- name: Generate configuration files for {{ docker_app_name }}
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.group | default('root') }}"
+    mode: "{{ item.mode | default('0644') }}"
+  loop: "{{ docker_app_templates }}"
+  loop_control:
+    label: "{{ item.dest | basename }}"
+  no_log: "{{ item.no_log | default(false) }}"
+  notify: "{{ item.notify | default(omit) }}"
+  register: _docker_app_config_results

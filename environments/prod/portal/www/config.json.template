@@ -1,0 +1,64 @@
+{
+  "domain": "${DOMAIN}",
+  "keycloak": {
+    "issuer": "${KEYCLOAK_ISSUER}",
+    "realm": "${KEYCLOAK_REALM}",
+    "clientId": "${OIDC_CLIENT_ID}"
+  },
+  "oauth2proxy": {
+    "cookieDomain": ".${DOMAIN}",
+    "sessionStore": "redis"
+  },
+  "portal": {
+    "adminGroup": "${PORTAL_ADMIN_GROUP}"
+  },
+  "vaultwarden": {
+    "enabled": ${VAULTWARDEN_ENABLED},
+    "url": "https://vault.${DOMAIN}",
+    "apiPort": 8087
+  },
+  "infrastructure": {
+    "serverIp": "${POC_IP}",
+    "dataDir": "${DATA_DIR}",
+    "services": {
+      "portal": {
+        "url": "https://${PORTAL_HOSTNAME}",
+        "httpPort": 80,
+        "httpsPort": 443
+      },
+      "guacamole": {
+        "url": "https://${GUACAMOLE_HOSTNAME}",
+        "httpPort": 8081,
+        "oidcClient": "${GUACAMOLE_OIDC_CLIENT_ID}"
+      },
+      "vaultwarden": {
+        "url": "https://${VAULTWARDEN_HOSTNAME}",
+        "httpPort": ${VAULTWARDEN_PORT},
+        "oidcClient": "${OIDCWARDEN_CLIENT_ID}",
+        "enabled": ${DEPLOY_VAULTWARDEN}
+      },
+      "linshare": {
+        "url": "https://${LINSHARE_HOSTNAME}",
+        "userPort": ${LINSHARE_USER_PORT},
+        "adminPort": ${LINSHARE_ADMIN_PORT},
+        "oidcClient": "${LINSHARE_OIDC_CLIENT_ID}",
+        "enabled": ${DEPLOY_LINSHARE}
+      },
+      "headscale": {
+        "url": "https://${HEADSCALE_HOSTNAME}",
+        "httpsPort": ${HEADSCALE_HTTPS_PORT},
+        "enabled": ${DEPLOY_HEADSCALE}
+      },
+      "credentialsApi": {
+        "enabled": ${DEPLOY_CREDENTIALS_API}
+      }
+    },
+    "groups": {
+      "adminInfra": "${ADMIN_GROUP}",
+      "adminApp": "${ADMIN_APP_GROUP}",
+      "users": "${USER_GROUP}"
+    }
+  },
+  "version": "2.0",
+  "lastUpdate": "${BUILD_DATE}"
+}
