@@ -1,0 +1,168 @@
+---
+# =============================================================================
+# SETUP-TBSCERTBOT.YML - Certificat commercial TBS Certificats
+# =============================================================================
+# Installe et configure tbscertbot pour gerer les certificats TBS.
+# Documentation : https://www.tbs-certificats.com/FAQ/fr/tbscertbot.html
+#
+# Prerequis:
+#   - Compte client TBS Certificats
+#   - Certificat commande (wildcard ou autre)
+#
+# Variables requises:
+#   - tbs_order_id: numero de commande TBS
+#   - tbs_api_login: login API TBS
+#   - tbs_api_password: mot de passe API TBS
+#   - domain: domaine du certificat
+#
+# Usage:
+#   ansible-playbook playbooks/setup-tbscertbot.yml \
+#     -e tbs_order_id=123456 \
+#     -e tbs_api_login=xxx \
+#     -e tbs_api_password=xxx \
+#     -e domain=example.com
+# =============================================================================
+
+- name: Setup TBS Certificats with tbscertbot
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    cert_domain: "{{ domain | default('example.com') }}"
+    cert_dir: /data/certs
+    tbscertbot_dir: /opt/tbscertbot
+    tbscertbot_config: /etc/tbscertbot
+    tbscertbot_repo: "https://github.com/AntoineMeresse/tbscertbot.git"
+
+  tasks:
+    - name: Validate required variables
+      ansible.builtin.assert:
+        that:
+          - tbs_order_id is defined
+          - tbs_api_login is defined
+          - tbs_api_password is defined
+        fail_msg: |
+          Variables requises manquantes. Fournir:
+            -e tbs_order_id=123456
+            -e tbs_api_login=xxx
+            -e tbs_api_password=xxx
+            -e domain=example.com
+
+    - name: Install dependencies
+      ansible.builtin.apt:
+        name:
+          - php-cli
+          - php-curl
+          - php-xml
+          - git
+          - openssl
+        state: present
+        update_cache: true
+
+    - name: Clone tbscertbot repository
+      ansible.builtin.git:
+        repo: "{{ tbscertbot_repo }}"
+        dest: "{{ tbscertbot_dir }}"
+        version: master
+        force: true
+      register: git_clone
+      failed_when: false
+
+    - name: Download tbscertbot manually if git failed
+      when: git_clone.failed | default(false)
+      block:
+        - name: Create tbscertbot directory
+          ansible.builtin.file:
+            path: "{{ tbscertbot_dir }}"
+            state: directory
+            mode: "0755"
+
+        - name: Download tbscertbot
+          ansible.builtin.get_url:
+            url: "https://www.tbs-certificats.com/downloads/tbscertbot.tar.gz"
+            dest: "/tmp/tbscertbot.tar.gz"
+            mode: "0644"
+
+        - name: Extract tbscertbot
+          ansible.builtin.unarchive:
+            src: "/tmp/tbscertbot.tar.gz"
+            dest: "{{ tbscertbot_dir }}"
+            remote_src: true
+
+    - name: Create config directory
+      ansible.builtin.file:
+        path: "{{ tbscertbot_config }}"
+        state: directory
+        mode: "0700"
+
+    - name: Create tbscertbot configuration
+      ansible.builtin.copy:
+        dest: "{{ tbscertbot_config }}/config.ini"
+        mode: "0600"
+        content: |
+          [api]
+          login = {{ tbs_api_login }}
+          password = {{ tbs_api_password }}
+
+          [certificate]
+          order_id = {{ tbs_order_id }}
+          domain = {{ cert_domain }}
+
+          [paths]
+          cert_dir = {{ cert_dir }}
+          key_file = {{ cert_dir }}/wildcard.{{ cert_domain }}.key
+          cert_file = {{ cert_dir }}/wildcard.{{ cert_domain }}.crt
+          chain_file = {{ cert_dir }}/wildcard.{{ cert_domain }}.chain.crt
+          fullchain_file = {{ cert_dir }}/wildcard.{{ cert_domain }}.fullchain.crt
+
+    - name: Ensure certs directory exists
+      ansible.builtin.file:
+        path: "{{ cert_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Create tbscertbot wrapper script
+      ansible.builtin.copy:
+        dest: /usr/local/bin/tbscertbot-renew
+        mode: "0755"
+        content: |
+          #!/bin/bash
+          # TBS Certificats renewal wrapper
+          cd {{ tbscertbot_dir }}
+          php tbscertbot.php --config {{ tbscertbot_config }}/config.ini renew
+
+          # Restart services if certificate was renewed
+          if [ $? -eq 0 ]; then
+              docker restart nginx-apps 2>/dev/null || true
+              echo "Certificate renewed and services restarted"
+          fi
+
+    - name: Setup auto-renewal cron
+      ansible.builtin.cron:
+        name: "tbscertbot renew"
+        minute: "0"
+        hour: "4"
+        day: "1"
+        job: "/usr/local/bin/tbscertbot-renew >> /var/log/tbscertbot.log 2>&1"
+        state: present
+
+    - name: Check if certificate exists
+      ansible.builtin.stat:
+        path: "{{ cert_dir }}/wildcard.{{ cert_domain }}.crt"
+      register: cert_exists
+
+    - name: Show next steps
+      ansible.builtin.debug:
+        msg:
+          - "TBScertbot installed in {{ tbscertbot_dir }}"
+          - "Configuration: {{ tbscertbot_config }}/config.ini"
+          - ""
+          - "Pour telecharger le certificat initial:"
+          - "  cd {{ tbscertbot_dir }}"
+          - "  php tbscertbot.php --config {{ tbscertbot_config }}/config.ini download"
+          - ""
+          - "Pour renouveler:"
+          - "  /usr/local/bin/tbscertbot-renew"
+          - ""
+          - "Cron configure pour renouvellement automatique le 1er de chaque mois a 4h"

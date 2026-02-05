@@ -488,6 +488,20 @@ setup_project_infra() {
         "" "" "" \
         "Deploie un certificat wildcard (-e cert_local_path=... -e key_local_path=...)"
 
+    create_template "$project_id" \
+        "Setup - Let's Encrypt OVH" \
+        "${PLAYBOOK_DIR}/setup-letsencrypt-ovh.yml" \
+        "$inv_id" "$repo_id" "$env_id" \
+        "" "" "" \
+        "Wildcard Let's Encrypt via DNS OVH (-e ovh_application_key=... -e letsencrypt_email=...)"
+
+    create_template "$project_id" \
+        "Setup - TBS Certificats" \
+        "${PLAYBOOK_DIR}/setup-tbscertbot.yml" \
+        "$inv_id" "$repo_id" "$env_id" \
+        "" "" "" \
+        "Certificat commercial TBS (-e tbs_order_id=... -e tbs_api_login=...)"
+
     log_ok "Projet '${project_name}' configure (${project_id})"
 }
 

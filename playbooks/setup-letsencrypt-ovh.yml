@@ -1,0 +1,134 @@
+---
+# =============================================================================
+# SETUP-LETSENCRYPT-OVH.YML - Certificat wildcard Let's Encrypt via DNS OVH
+# =============================================================================
+# Genere un certificat wildcard via DNS challenge avec l'API OVH.
+#
+# Prerequis:
+#   - Creer une application OVH : https://eu.api.ovh.com/createApp/
+#   - Obtenir un consumer key avec les droits DNS
+#
+# Variables requises (via -e ou group_vars):
+#   - ovh_application_key
+#   - ovh_application_secret
+#   - ovh_consumer_key
+#   - letsencrypt_email
+#   - domain (default: timox.org)
+#
+# Usage:
+#   ansible-playbook playbooks/setup-letsencrypt-ovh.yml \
+#     -e ovh_application_key=xxx \
+#     -e ovh_application_secret=xxx \
+#     -e ovh_consumer_key=xxx \
+#     -e letsencrypt_email=admin@example.com
+# =============================================================================
+
+- name: Setup Let's Encrypt wildcard certificate via OVH DNS
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    cert_domain: "{{ domain | default('timox.org') }}"
+    cert_dir: /data/certs
+    certbot_config_dir: /etc/letsencrypt
+    ovh_config_file: /root/.ovh.ini
+    # Staging pour les tests (moins de rate limiting)
+    letsencrypt_staging: false
+
+  tasks:
+    - name: Validate required variables
+      ansible.builtin.assert:
+        that:
+          - ovh_application_key is defined
+          - ovh_application_secret is defined
+          - ovh_consumer_key is defined
+          - letsencrypt_email is defined
+        fail_msg: |
+          Variables requises manquantes. Fournir:
+            -e ovh_application_key=xxx
+            -e ovh_application_secret=xxx
+            -e ovh_consumer_key=xxx
+            -e letsencrypt_email=admin@example.com
+
+    - name: Install certbot and OVH plugin
+      ansible.builtin.apt:
+        name:
+          - certbot
+          - python3-certbot-dns-ovh
+        state: present
+        update_cache: true
+
+    - name: Create OVH credentials file
+      ansible.builtin.copy:
+        dest: "{{ ovh_config_file }}"
+        mode: "0600"
+        content: |
+          # OVH API credentials for certbot
+          dns_ovh_endpoint = ovh-eu
+          dns_ovh_application_key = {{ ovh_application_key }}
+          dns_ovh_application_secret = {{ ovh_application_secret }}
+          dns_ovh_consumer_key = {{ ovh_consumer_key }}
+
+    - name: Ensure certs directory exists
+      ansible.builtin.file:
+        path: "{{ cert_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Check if certificate already exists
+      ansible.builtin.stat:
+        path: "{{ certbot_config_dir }}/live/{{ cert_domain }}/fullchain.pem"
+      register: cert_exists
+
+    - name: Request wildcard certificate
+      when: not cert_exists.stat.exists or force | default(false) | bool
+      ansible.builtin.command:
+        cmd: >-
+          certbot certonly
+          --dns-ovh
+          --dns-ovh-credentials {{ ovh_config_file }}
+          --dns-ovh-propagation-seconds 60
+          -d "{{ cert_domain }}"
+          -d "*.{{ cert_domain }}"
+          --email {{ letsencrypt_email }}
+          --agree-tos
+          --non-interactive
+          {{ '--staging' if letsencrypt_staging else '' }}
+          {{ '--force-renewal' if force | default(false) | bool else '' }}
+      register: certbot_result
+
+    - name: Display certbot output
+      when: certbot_result is defined
+      ansible.builtin.debug:
+        msg: "{{ certbot_result.stdout_lines | default([]) }}"
+
+    - name: Create symlinks in /data/certs
+      ansible.builtin.file:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        state: link
+        force: true
+      loop:
+        - src: "{{ certbot_config_dir }}/live/{{ cert_domain }}/fullchain.pem"
+          dest: "{{ cert_dir }}/wildcard.{{ cert_domain }}.crt"
+        - src: "{{ certbot_config_dir }}/live/{{ cert_domain }}/privkey.pem"
+          dest: "{{ cert_dir }}/wildcard.{{ cert_domain }}.key"
+
+    - name: Setup auto-renewal cron
+      ansible.builtin.cron:
+        name: "certbot renew"
+        minute: "0"
+        hour: "3"
+        job: "certbot renew --quiet --post-hook 'docker restart nginx-apps 2>/dev/null || true'"
+        state: present
+
+    - name: Verify certificate
+      ansible.builtin.command:
+        cmd: openssl x509 -in {{ cert_dir }}/wildcard.{{ cert_domain }}.crt -noout -subject -dates -issuer
+      register: cert_info
+      changed_when: false
+
+    - name: Show certificate details
+      ansible.builtin.debug:
+        msg: "{{ cert_info.stdout_lines }}"
