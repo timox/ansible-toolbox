@@ -5,7 +5,7 @@
 
 # SSH key deployment
 bootstrap_deploy_ssh_key: true
-bootstrap_ssh_public_key: "{{ vault_ssh_public_key }}"
+bootstrap_ssh_public_key: ""
 
 # System packages
 bootstrap_install_packages: true

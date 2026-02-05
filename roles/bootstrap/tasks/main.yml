@@ -5,7 +5,10 @@
 
 - name: Deploy SSH key
   ansible.builtin.include_tasks: ssh_key.yml
-  when: bootstrap_deploy_ssh_key | bool
+  when:
+    - bootstrap_deploy_ssh_key | bool
+    - bootstrap_ssh_public_key is defined
+    - bootstrap_ssh_public_key | length > 0
   tags: [ssh, bootstrap]
 
 - name: Install prerequisites
