@@ -1,0 +1,123 @@
+---
+# =============================================================================
+# PORTAL-CHECK.YML - Verification de l'etat des services portail
+# =============================================================================
+# Affiche l'etat des containers Docker et les infos deploy.sh --info
+#
+# Usage:
+#   ansible-playbook playbooks/portal-check.yml
+#   ansible-playbook playbooks/portal-check.yml --limit vps-ovh
+# =============================================================================
+
+- name: Check portal services status
+  hosts: portal_servers
+  become: true
+  gather_facts: true
+
+  vars:
+    deploy_script_paths:
+      - /home/{{ ansible_user }}/environments/prod/deploy.sh
+      - /opt/portal/deploy.sh
+      - /data/portal/deploy.sh
+
+  tasks:
+    # --- Systeme ---------------------------------------------------------------
+    - name: System summary
+      ansible.builtin.debug:
+        msg:
+          - "Hostname: {{ ansible_hostname }}"
+          - "OS: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+          - "Uptime: {{ ansible_uptime_seconds | int // 86400 }}d {{ (ansible_uptime_seconds | int % 86400) // 3600 }}h"
+          - "RAM: {{ ansible_memfree_mb }}MB free / {{ ansible_memtotal_mb }}MB total"
+
+    - name: Check disk usage
+      ansible.builtin.command:
+        cmd: df -h / /data
+      register: disk_usage
+      changed_when: false
+      failed_when: false
+
+    - name: Display disk usage
+      ansible.builtin.debug:
+        msg: "{{ disk_usage.stdout_lines }}"
+
+    # --- Docker ----------------------------------------------------------------
+    - name: Check Docker is running
+      ansible.builtin.command:
+        cmd: docker version --format "Docker {{ '{{' }}.Server.Version{{ '}}' }}"
+      register: docker_version
+      changed_when: false
+      failed_when: false
+
+    - name: Display Docker version
+      ansible.builtin.debug:
+        msg: "{{ docker_version.stdout | default('Docker NOT installed or not running') }}"
+
+    - name: List all containers (running + stopped)
+      ansible.builtin.command:
+        cmd: >-
+          docker ps -a
+          --format "table {{ '{{' }}.Names{{ '}}' }}\t{{ '{{' }}.Status{{ '}}' }}\t{{ '{{' }}.Ports{{ '}}' }}"
+      register: docker_ps
+      changed_when: false
+      failed_when: false
+
+    - name: Display containers
+      ansible.builtin.debug:
+        msg: "{{ docker_ps.stdout_lines | default(['No containers']) }}"
+
+    - name: Container count summary
+      ansible.builtin.shell:
+        cmd: |
+          echo "Running: $(docker ps -q | wc -l)"
+          echo "Stopped: $(docker ps -q -f status=exited | wc -l)"
+          echo "Total:   $(docker ps -aq | wc -l)"
+      register: container_count
+      changed_when: false
+      failed_when: false
+
+    - name: Display container counts
+      ansible.builtin.debug:
+        msg: "{{ container_count.stdout_lines }}"
+
+    # --- deploy.sh --info ------------------------------------------------------
+    - name: Search for deploy.sh
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop: "{{ deploy_script_paths }}"
+      register: deploy_script_check
+
+    - name: Set deploy.sh path
+      ansible.builtin.set_fact:
+        deploy_script: "{{ (deploy_script_check.results | selectattr('stat.exists') | first).item | default('') }}"
+      failed_when: false
+
+    - name: Run deploy.sh --info
+      ansible.builtin.command:
+        cmd: "{{ deploy_script }} --info"
+      register: deploy_info
+      changed_when: false
+      failed_when: false
+      when: deploy_script | length > 0
+
+    - name: Display deploy.sh --info
+      ansible.builtin.debug:
+        msg: "{{ deploy_info.stdout_lines }}"
+      when: deploy_script | length > 0 and deploy_info.rc == 0
+
+    - name: No deploy.sh found
+      ansible.builtin.debug:
+        msg: "deploy.sh not found in {{ deploy_script_paths | join(', ') }}"
+      when: deploy_script | length == 0
+
+    # --- Docker networks -------------------------------------------------------
+    - name: List Docker networks
+      ansible.builtin.command:
+        cmd: docker network ls --format "{{ '{{' }}.Name{{ '}}' }}\t{{ '{{' }}.Driver{{ '}}' }}"
+      register: docker_networks
+      changed_when: false
+      failed_when: false
+
+    - name: Display networks
+      ansible.builtin.debug:
+        msg: "{{ docker_networks.stdout_lines }}"

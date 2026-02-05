@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: ${SEMAPHORE_DB_PASS}
       POSTGRES_DB: ${SEMAPHORE_DB_NAME}
     volumes:
-      - semaphore-db-data:/var/lib/postgresql/data
+      - /data/semaphore/semaphore-db-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${SEMAPHORE_DB_USER} -d ${SEMAPHORE_DB_NAME}"]
       interval: 10s
@@ -34,9 +34,9 @@ services:
       SEMAPHORE_ADMIN_PASSWORD: ${SEMAPHORE_ADMIN_PASSWORD}
       SEMAPHORE_ACCESS_KEY_ENCRYPTION: ${SEMAPHORE_ACCESS_KEY_ENCRYPTION}
     volumes:
-      - semaphore-data:/tmp/semaphore
+      - /data/semaphore/semaphore-data:/tmp/semaphore
       - /var/run/docker.sock:/var/run/docker.sock
-      - /data:/data
+      - /data/semaphore:/data/semaphore
     depends_on:
       semaphore-db:
         condition: service_healthy

@@ -56,11 +56,11 @@ TOKEN=""
 
 # --- Fonctions utilitaires ---------------------------------------------------
 
-log_info()  { echo -e "${BLUE}[INFO]${NC} $*"; }
-log_ok()    { echo -e "${GREEN}[OK]${NC} $*"; }
-log_warn()  { echo -e "${YELLOW}[WARN]${NC} $*"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $*"; }
-log_section() { echo -e "\n${BLUE}=== $* ===${NC}"; }
+log_info()  { echo -e "${BLUE}[INFO]${NC} $*" >&2; }
+log_ok()    { echo -e "${GREEN}[OK]${NC} $*" >&2; }
+log_warn()  { echo -e "${YELLOW}[WARN]${NC} $*" >&2; }
+log_error() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
+log_section() { echo -e "\n${BLUE}=== $* ===${NC}" >&2; }
 
 # Appel API generique
 api_call() {
@@ -228,7 +228,7 @@ create_key_ssh() {
 
     local result
     result=$(api_call POST "/project/${project_id}/keys" \
-        "{\"name\":\"${name}\",\"type\":\"ssh\",\"project_id\":${project_id},\"ssh\":{\"login\":\"${login}\",\"private_key\":${escaped_key}}}")
+        "{\"name\":\"${name}\",\"type\":\"ssh\",\"project_id\":${project_id},\"ssh\":{\"login\":\"${login}\",\"passphrase\":\"\",\"private_key\":${escaped_key}}}")
     local id
     id=$(echo "$result" | jq -r '.id')
     log_ok "  Key '${name}' creee (ssh, id: ${id})"
@@ -280,8 +280,7 @@ create_inventory() {
     local name="$2"
     local file_path="$3"
     local ssh_key_id="$4"
-    local become_key_id="$5"
-    local repo_id="$6"
+    local repo_id="$5"
 
     local existing
     existing=$(find_inventory "$project_id" "$name")
@@ -293,7 +292,7 @@ create_inventory() {
 
     local result
     result=$(api_call POST "/project/${project_id}/inventory" \
-        "{\"name\":\"${name}\",\"project_id\":${project_id},\"inventory\":\"${file_path}\",\"type\":\"file\",\"ssh_key_id\":${ssh_key_id},\"become_key_id\":${become_key_id},\"repository_id\":${repo_id}}")
+        "{\"name\":\"${name}\",\"project_id\":${project_id},\"inventory\":\"${file_path}\",\"type\":\"file\",\"ssh_key_id\":${ssh_key_id},\"repository_id\":${repo_id}}")
     local id
     id=$(echo "$result" | jq -r '.id')
     log_ok "  Inventaire '${name}' cree (id: ${id})"
@@ -437,12 +436,12 @@ setup_project_infra() {
     # Inventaire
     log_info "Configuration de l'inventaire..."
     local inv_id
-    inv_id=$(create_inventory "$project_id" "all-servers" "$INVENTORY_PATH" "$key_ssh" "$key_ssh" "$repo_id")
+    inv_id=$(create_inventory "$project_id" "vps-ovh" "$INVENTORY_PATH" "$key_ssh" "$repo_id")
 
     # Environnement
     log_info "Configuration de l'environnement..."
     local env_id
-    env_id=$(create_environment "$project_id" "production")
+    env_id=$(create_environment "$project_id" "lab")
 
     # Templates
     log_info "Creation des templates..."
@@ -465,7 +464,7 @@ setup_project_infra() {
         "Check - Server state" \
         "${PLAYBOOK_DIR}/check.yml" \
         "$inv_id" "$repo_id" "$env_id" \
-        "" "" "" \
+        "" "" "$key_vault" \
         "Verification de l'etat des serveurs (connectivity, services)"
 
     log_ok "Projet '${project_name}' configure (${project_id})"
@@ -506,19 +505,22 @@ setup_project_portal() {
     # Inventaire
     log_info "Configuration de l'inventaire..."
     local inv_id
-    inv_id=$(create_inventory "$project_id" "portal-servers" "$INVENTORY_PATH" "$key_ssh" "$key_ssh" "$repo_id")
+    inv_id=$(create_inventory "$project_id" "portal-servers" "$INVENTORY_PATH" "$key_ssh" "$repo_id")
 
     # Environnement
     log_info "Configuration de l'environnement..."
     local env_id
-    env_id=$(create_environment "$project_id" "production")
+    env_id=$(create_environment "$project_id" "lab")
 
     # Templates
     log_info "Creation des templates..."
 
-    # Survey pour le choix du service
-    local survey_service='[{"name":"service","title":"Service","description":"Nom du service a deployer","type":"","required":true,"enum":["keycloak","oauth2-proxy","guacamole","credentials-api","portal-api","vaultwarden","headscale","linshare","bookstack"]}]'
-    local survey_destroy='[{"name":"service","title":"Service","description":"Nom du service a detruire","type":"","required":true,"enum":["all","keycloak","oauth2-proxy","guacamole","credentials-api","portal-api","vaultwarden","headscale","linshare","bookstack"]},{"name":"confirm","title":"Confirmation","description":"Taper true pour confirmer la destruction","type":"","required":true,"enum":["true","false"]}]'
+    create_template "$project_id" \
+        "Portal - Check Status" \
+        "${PLAYBOOK_DIR}/portal-check.yml" \
+        "$inv_id" "$repo_id" "$env_id" \
+        "" "" "$key_vault" \
+        "Verification de l'etat des containers et services portail"
 
     create_template "$project_id" \
         "Portal - Deploy Stack Complete" \
@@ -538,15 +540,15 @@ setup_project_portal() {
         "Portal - Deploy Service" \
         "${PLAYBOOK_DIR}/portal-deploy-service.yml" \
         "$inv_id" "$repo_id" "$env_id" \
-        "" "$survey_service" "$key_vault" \
-        "Deploiement d'un service individuel (keycloak, oauth2-proxy, guacamole, etc.)"
+        "" "" "$key_vault" \
+        "Deploiement d'un service (-e service=keycloak)"
 
     create_template "$project_id" \
         "Portal - Destroy Service" \
         "${PLAYBOOK_DIR}/portal-destroy.yml" \
         "$inv_id" "$repo_id" "$env_id" \
-        "" "$survey_destroy" "$key_vault" \
-        "Destruction d'un service (necessite confirmation)"
+        "" "" "$key_vault" \
+        "Destruction d'un service (-e service=xxx -e confirm=true)"
 
     log_ok "Projet '${project_name}' configure (${project_id})"
 }
@@ -579,12 +581,12 @@ setup_project_monitoring() {
     # Inventaire
     log_info "Configuration de l'inventaire..."
     local inv_id
-    inv_id=$(create_inventory "$project_id" "zabbix-agents" "$INVENTORY_PATH" "$key_ssh" "$key_ssh" "$repo_id")
+    inv_id=$(create_inventory "$project_id" "zabbix-agents" "$INVENTORY_PATH" "$key_ssh" "$repo_id")
 
     # Environnement
     log_info "Configuration de l'environnement..."
     local env_id
-    env_id=$(create_environment "$project_id" "production")
+    env_id=$(create_environment "$project_id" "lab")
 
     # Templates
     log_info "Creation des templates..."
@@ -634,12 +636,12 @@ setup_project_network() {
     # Inventaire
     log_info "Configuration de l'inventaire..."
     local inv_id
-    inv_id=$(create_inventory "$project_id" "network-devices" "$INVENTORY_PATH" "$key_cisco" "$key_cisco" "$repo_id")
+    inv_id=$(create_inventory "$project_id" "network-devices" "$INVENTORY_PATH" "$key_cisco" "$repo_id")
 
     # Environnement
     log_info "Configuration de l'environnement..."
     local env_id
-    env_id=$(create_environment "$project_id" "production")
+    env_id=$(create_environment "$project_id" "lab")
 
     # Templates
     log_info "Creation des templates..."
@@ -668,32 +670,32 @@ setup_project_network() {
 print_summary() {
     log_section "Resume"
 
-    echo -e "\nProjets crees :"
-    echo -e "  ${GREEN}1.${NC} ${PROJECT_INFRA}"
-    echo -e "     Templates : Bootstrap - Server, Bootstrap - Dry Run, Check - Server state"
-    echo -e "     Keys      : git-toolbox, ssh-servers, vault-password"
-    echo ""
-    echo -e "  ${GREEN}2.${NC} ${PROJECT_PORTAL}"
-    echo -e "     Templates : Portal - Deploy Stack Complete, Portal - Dry Run,"
-    echo -e "                 Portal - Deploy Service, Portal - Destroy Service"
-    echo -e "     Keys      : git-toolbox, ssh-servers, vault-password"
-    echo ""
-    echo -e "  ${GREEN}3.${NC} ${PROJECT_MONITORING}"
-    echo -e "     Templates : Deploy - Zabbix Agent 2, Deploy - Zabbix Agent 2 (Dry Run)"
-    echo -e "     Keys      : git-toolbox, ssh-servers"
-    echo ""
-    echo -e "  ${GREEN}4.${NC} ${PROJECT_NETWORK}"
-    echo -e "     Templates : Backup - Network configs, Backup - Network configs (no push)"
-    echo -e "     Keys      : git-toolbox, cisco-credentials"
-    echo ""
+    echo -e "\nProjets crees :" >&2
+    echo -e "  ${GREEN}1.${NC} ${PROJECT_INFRA}" >&2
+    echo -e "     Templates : Bootstrap - Server, Bootstrap - Dry Run, Check - Server state" >&2
+    echo -e "     Keys      : git-toolbox, ssh-servers, vault-password" >&2
+    echo "" >&2
+    echo -e "  ${GREEN}2.${NC} ${PROJECT_PORTAL}" >&2
+    echo -e "     Templates : Portal - Check Status, Portal - Deploy Stack Complete," >&2
+    echo -e "                 Portal - Dry Run, Portal - Deploy Service, Portal - Destroy Service" >&2
+    echo -e "     Keys      : git-toolbox, ssh-servers, vault-password" >&2
+    echo "" >&2
+    echo -e "  ${GREEN}3.${NC} ${PROJECT_MONITORING}" >&2
+    echo -e "     Templates : Deploy - Zabbix Agent 2, Deploy - Zabbix Agent 2 (Dry Run)" >&2
+    echo -e "     Keys      : git-toolbox, ssh-servers" >&2
+    echo "" >&2
+    echo -e "  ${GREEN}4.${NC} ${PROJECT_NETWORK}" >&2
+    echo -e "     Templates : Backup - Network configs, Backup - Network configs (no push)" >&2
+    echo -e "     Keys      : git-toolbox, cisco-credentials" >&2
+    echo "" >&2
 
-    echo -e "Acces Semaphore : ${BLUE}${SEMAPHORE_URL}${NC}"
-    echo -e "Utilisateur     : ${SEMAPHORE_ADMIN_USER}"
-    echo ""
-    echo -e "${YELLOW}Prochaines etapes :${NC}"
-    echo "  1. Verifier les credentials dans Key Store (SSH key, vault password)"
-    echo "  2. Configurer les hosts dans inventory/hosts.yml"
-    echo "  3. Lancer un template de test"
+    echo -e "Acces Semaphore : ${BLUE}${SEMAPHORE_URL}${NC}" >&2
+    echo -e "Utilisateur     : ${SEMAPHORE_ADMIN_USER}" >&2
+    echo "" >&2
+    echo -e "${YELLOW}Prochaines etapes :${NC}" >&2
+    echo "  1. Verifier les credentials dans Key Store (SSH key, vault password)" >&2
+    echo "  2. Configurer les hosts dans inventory/hosts.yml" >&2
+    echo "  3. Lancer un template de test" >&2
 }
 
 # ==============================================================================
@@ -701,10 +703,10 @@ print_summary() {
 # ==============================================================================
 
 main() {
-    echo -e "${BLUE}=============================================${NC}"
-    echo -e "${BLUE}  Semaphore - Configuration multi-projets${NC}"
-    echo -e "${BLUE}=============================================${NC}"
-    echo ""
+    echo -e "${BLUE}=============================================${NC}" >&2
+    echo -e "${BLUE}  Semaphore - Configuration multi-projets${NC}" >&2
+    echo -e "${BLUE}=============================================${NC}" >&2
+    echo "" >&2
 
     # Verifier les prerequis
     if ! command -v jq &>/dev/null; then
