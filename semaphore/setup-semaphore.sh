@@ -493,7 +493,7 @@ setup_project_infra() {
         "${PLAYBOOK_DIR}/setup-letsencrypt-ovh.yml" \
         "$inv_id" "$repo_id" "$env_id" \
         "" "" "" \
-        "Wildcard Let's Encrypt via DNS OVH (-e ovh_application_key=... -e letsencrypt_email=...)"
+        "Wildcard Let's Encrypt via DNS OVH. Etape 1: -e generate_consumer_key=true. Etape 2: -e ovh_consumer_key=xxx"
 
     create_template "$project_id" \
         "Setup - TBS Certificats" \

@@ -2,25 +2,50 @@
 # =============================================================================
 # SETUP-LETSENCRYPT-OVH.YML - Certificat wildcard Let's Encrypt via DNS OVH
 # =============================================================================
-# Genere un certificat wildcard via DNS challenge avec l'API OVH.
 #
-# Prerequis:
-#   - Creer une application OVH : https://eu.api.ovh.com/createApp/
-#   - Obtenir un consumer key avec les droits DNS
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │                    COMMENT OBTENIR LES CLEFS OVH                        │
+# ├─────────────────────────────────────────────────────────────────────────┤
+# │                                                                         │
+# │  ETAPE 1 : Creer l'application (une seule fois, manuel)                │
+# │  ──────────────────────────────────────────────────────                 │
+# │  1. Aller sur : https://eu.api.ovh.com/createApp/                      │
+# │  2. Se connecter avec le compte OVH                                     │
+# │  3. Remplir :                                                           │
+# │     - Application name : certbot-ansible                                │
+# │     - Description : Let's Encrypt DNS challenge                         │
+# │  4. Noter les 2 clefs affichees :                                       │
+# │     - Application Key    → ovh_application_key                          │
+# │     - Application Secret → ovh_application_secret                       │
+# │                                                                         │
+# │  ETAPE 2 : Generer le Consumer Key (automatique avec ce playbook)      │
+# │  ────────────────────────────────────────────────────────────          │
+# │  Lancer ce playbook avec generate_consumer_key=true :                   │
+# │                                                                         │
+# │    -e ovh_application_key=xxx                                           │
+# │    -e ovh_application_secret=xxx                                        │
+# │    -e generate_consumer_key=true                                        │
+# │                                                                         │
+# │  Le playbook affiche un lien de validation OVH a ouvrir dans le        │
+# │  navigateur. Choisir "Unlimited" pour la duree.                         │
+# │  Une fois valide, relancer le playbook avec le consumer_key.           │
+# │                                                                         │
+# │  ETAPE 3 : Generer le certificat                                        │
+# │  ──────────────────────────────────                                     │
+# │  Avec les 3 clefs :                                                     │
+# │                                                                         │
+# │    -e ovh_application_key=xxx                                           │
+# │    -e ovh_application_secret=xxx                                        │
+# │    -e ovh_consumer_key=xxx                                              │
+# │    -e letsencrypt_email=admin@example.com                               │
+# │    -e domain=timox.org                                                  │
+# │                                                                         │
+# └─────────────────────────────────────────────────────────────────────────┘
 #
-# Variables requises (via -e ou group_vars):
-#   - ovh_application_key
-#   - ovh_application_secret
-#   - ovh_consumer_key
-#   - letsencrypt_email
-#   - domain (default: timox.org)
+# Options supplementaires:
+#   -e force=true              : Regenerer meme si le certificat existe
+#   -e letsencrypt_staging=true: Utiliser le serveur de test Let's Encrypt
 #
-# Usage:
-#   ansible-playbook playbooks/setup-letsencrypt-ovh.yml \
-#     -e ovh_application_key=xxx \
-#     -e ovh_application_secret=xxx \
-#     -e ovh_consumer_key=xxx \
-#     -e letsencrypt_email=admin@example.com
 # =============================================================================
 
 - name: Setup Let's Encrypt wildcard certificate via OVH DNS
@@ -37,7 +62,72 @@
     letsencrypt_staging: false
 
   tasks:
-    - name: Validate required variables
+    # =========================================================================
+    # MODE 1 : Generation du Consumer Key (si generate_consumer_key=true)
+    # =========================================================================
+    - name: Generate OVH Consumer Key
+      when: generate_consumer_key | default(false) | bool
+      block:
+        - name: Validate application credentials
+          ansible.builtin.assert:
+            that:
+              - ovh_application_key is defined
+              - ovh_application_secret is defined
+            fail_msg: |
+              Pour generer le consumer_key, fournir:
+                -e ovh_application_key=xxx
+                -e ovh_application_secret=xxx
+                -e generate_consumer_key=true
+
+        - name: Request consumer key from OVH API
+          ansible.builtin.uri:
+            url: "https://eu.api.ovh.com/1.0/auth/credential"
+            method: POST
+            headers:
+              Content-Type: "application/json"
+              X-Ovh-Application: "{{ ovh_application_key }}"
+            body_format: json
+            body:
+              accessRules:
+                - method: GET
+                  path: "/domain/zone/*"
+                - method: POST
+                  path: "/domain/zone/*"
+                - method: DELETE
+                  path: "/domain/zone/*"
+              redirection: "https://ovh.com"
+            return_content: true
+          register: ovh_credential_response
+
+        - name: Display Consumer Key and Validation URL
+          ansible.builtin.debug:
+            msg:
+              - "╔══════════════════════════════════════════════════════════════════╗"
+              - "║              CONSUMER KEY GENERE - ACTION REQUISE                ║"
+              - "╠══════════════════════════════════════════════════════════════════╣"
+              - "║                                                                  ║"
+              - "║  Consumer Key : {{ ovh_credential_response.json.consumerKey }}"
+              - "║                                                                  ║"
+              - "║  ETAPE SUIVANTE :                                                ║"
+              - "║  1. Ouvrir ce lien dans un navigateur :                          ║"
+              - "║     {{ ovh_credential_response.json.validationUrl }}"
+              - "║                                                                  ║"
+              - "║  2. Se connecter OVH et choisir 'Unlimited' pour la duree       ║"
+              - "║                                                                  ║"
+              - "║  3. Relancer ce playbook avec :                                  ║"
+              - "║     -e ovh_consumer_key={{ ovh_credential_response.json.consumerKey }}"
+              - "║                                                                  ║"
+              - "╚══════════════════════════════════════════════════════════════════╝"
+
+        - name: Stop here - manual validation required
+          ansible.builtin.fail:
+            msg: "Valider le consumer_key via le lien ci-dessus, puis relancer avec -e ovh_consumer_key=..."
+
+    # =========================================================================
+    # MODE 2 : Generation du certificat (avec les 3 clefs)
+    # =========================================================================
+    - name: Validate required variables for certificate
+      when: not (generate_consumer_key | default(false) | bool)
       ansible.builtin.assert:
         that:
           - ovh_application_key is defined
@@ -51,84 +141,90 @@
             -e ovh_consumer_key=xxx
             -e letsencrypt_email=admin@example.com
 
-    - name: Install certbot and OVH plugin
-      ansible.builtin.apt:
-        name:
-          - certbot
-          - python3-certbot-dns-ovh
-        state: present
-        update_cache: true
+          Ou pour generer le consumer_key:
+            -e generate_consumer_key=true
 
-    - name: Create OVH credentials file
-      ansible.builtin.copy:
-        dest: "{{ ovh_config_file }}"
-        mode: "0600"
-        content: |
-          # OVH API credentials for certbot
-          dns_ovh_endpoint = ovh-eu
-          dns_ovh_application_key = {{ ovh_application_key }}
-          dns_ovh_application_secret = {{ ovh_application_secret }}
-          dns_ovh_consumer_key = {{ ovh_consumer_key }}
+    - name: Generate certificate
+      when: not (generate_consumer_key | default(false) | bool)
+      block:
+        - name: Install certbot and OVH plugin
+          ansible.builtin.apt:
+            name:
+              - certbot
+              - python3-certbot-dns-ovh
+            state: present
+            update_cache: true
 
-    - name: Ensure certs directory exists
-      ansible.builtin.file:
-        path: "{{ cert_dir }}"
-        state: directory
-        mode: "0755"
+        - name: Create OVH credentials file
+          ansible.builtin.copy:
+            dest: "{{ ovh_config_file }}"
+            mode: "0600"
+            content: |
+              # OVH API credentials for certbot
+              dns_ovh_endpoint = ovh-eu
+              dns_ovh_application_key = {{ ovh_application_key }}
+              dns_ovh_application_secret = {{ ovh_application_secret }}
+              dns_ovh_consumer_key = {{ ovh_consumer_key }}
 
-    - name: Check if certificate already exists
-      ansible.builtin.stat:
-        path: "{{ certbot_config_dir }}/live/{{ cert_domain }}/fullchain.pem"
-      register: cert_exists
+        - name: Ensure certs directory exists
+          ansible.builtin.file:
+            path: "{{ cert_dir }}"
+            state: directory
+            mode: "0755"
 
-    - name: Request wildcard certificate
-      when: not cert_exists.stat.exists or force | default(false) | bool
-      ansible.builtin.command:
-        cmd: >-
-          certbot certonly
-          --dns-ovh
-          --dns-ovh-credentials {{ ovh_config_file }}
-          --dns-ovh-propagation-seconds 60
-          -d "{{ cert_domain }}"
-          -d "*.{{ cert_domain }}"
-          --email {{ letsencrypt_email }}
-          --agree-tos
-          --non-interactive
-          {{ '--staging' if letsencrypt_staging else '' }}
-          {{ '--force-renewal' if force | default(false) | bool else '' }}
-      register: certbot_result
+        - name: Check if certificate already exists
+          ansible.builtin.stat:
+            path: "{{ certbot_config_dir }}/live/{{ cert_domain }}/fullchain.pem"
+          register: cert_exists
 
-    - name: Display certbot output
-      when: certbot_result is defined
-      ansible.builtin.debug:
-        msg: "{{ certbot_result.stdout_lines | default([]) }}"
+        - name: Request wildcard certificate
+          when: not cert_exists.stat.exists or force | default(false) | bool
+          ansible.builtin.command:
+            cmd: >-
+              certbot certonly
+              --dns-ovh
+              --dns-ovh-credentials {{ ovh_config_file }}
+              --dns-ovh-propagation-seconds 60
+              -d "{{ cert_domain }}"
+              -d "*.{{ cert_domain }}"
+              --email {{ letsencrypt_email }}
+              --agree-tos
+              --non-interactive
+              {{ '--staging' if letsencrypt_staging else '' }}
+              {{ '--force-renewal' if force | default(false) | bool else '' }}
+          register: certbot_result
 
-    - name: Create symlinks in /data/certs
-      ansible.builtin.file:
-        src: "{{ item.src }}"
-        dest: "{{ item.dest }}"
-        state: link
-        force: true
-      loop:
-        - src: "{{ certbot_config_dir }}/live/{{ cert_domain }}/fullchain.pem"
-          dest: "{{ cert_dir }}/wildcard.{{ cert_domain }}.crt"
-        - src: "{{ certbot_config_dir }}/live/{{ cert_domain }}/privkey.pem"
-          dest: "{{ cert_dir }}/wildcard.{{ cert_domain }}.key"
+        - name: Display certbot output
+          when: certbot_result is defined
+          ansible.builtin.debug:
+            msg: "{{ certbot_result.stdout_lines | default([]) }}"
 
-    - name: Setup auto-renewal cron
-      ansible.builtin.cron:
-        name: "certbot renew"
-        minute: "0"
-        hour: "3"
-        job: "certbot renew --quiet --post-hook 'docker restart nginx-apps 2>/dev/null || true'"
-        state: present
+        - name: Create symlinks in /data/certs
+          ansible.builtin.file:
+            src: "{{ item.src }}"
+            dest: "{{ item.dest }}"
+            state: link
+            force: true
+          loop:
+            - src: "{{ certbot_config_dir }}/live/{{ cert_domain }}/fullchain.pem"
+              dest: "{{ cert_dir }}/wildcard.{{ cert_domain }}.crt"
+            - src: "{{ certbot_config_dir }}/live/{{ cert_domain }}/privkey.pem"
+              dest: "{{ cert_dir }}/wildcard.{{ cert_domain }}.key"
 
-    - name: Verify certificate
-      ansible.builtin.command:
-        cmd: openssl x509 -in {{ cert_dir }}/wildcard.{{ cert_domain }}.crt -noout -subject -dates -issuer
-      register: cert_info
-      changed_when: false
+        - name: Setup auto-renewal cron
+          ansible.builtin.cron:
+            name: "certbot renew"
+            minute: "0"
+            hour: "3"
+            job: "certbot renew --quiet --post-hook 'docker restart nginx-apps 2>/dev/null || true'"
+            state: present
 
-    - name: Show certificate details
-      ansible.builtin.debug:
-        msg: "{{ cert_info.stdout_lines }}"
+        - name: Verify certificate
+          ansible.builtin.command:
+            cmd: openssl x509 -in {{ cert_dir }}/wildcard.{{ cert_domain }}.crt -noout -subject -dates -issuer
+          register: cert_info
+          changed_when: false
+
+        - name: Show certificate details
+          ansible.builtin.debug:
+            msg: "{{ cert_info.stdout_lines }}"
