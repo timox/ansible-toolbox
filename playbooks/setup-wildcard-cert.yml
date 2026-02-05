@@ -1,0 +1,99 @@
+---
+# =============================================================================
+# SETUP-WILDCARD-CERT.YML - Deploie un certificat wildcard existant
+# =============================================================================
+# Le certificat doit etre fourni via les variables ou fichiers locaux.
+#
+# Usage:
+#   ansible-playbook playbooks/setup-wildcard-cert.yml \
+#     -e cert_content="$(cat wildcard.crt)" \
+#     -e key_content="$(cat wildcard.key)"
+#
+# Ou via fichiers locaux:
+#   ansible-playbook playbooks/setup-wildcard-cert.yml \
+#     -e cert_local_path=/path/to/wildcard.crt \
+#     -e key_local_path=/path/to/wildcard.key
+# =============================================================================
+
+- name: Deploy wildcard SSL certificate
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    cert_domain: "{{ domain | default('timox.org') }}"
+    cert_dir: /data/certs
+
+  tasks:
+    - name: Ensure certs directory exists
+      ansible.builtin.file:
+        path: "{{ cert_dir }}"
+        state: directory
+        mode: "0755"
+
+    # Method 1: Copy from local files
+    - name: Deploy certificate from local files
+      when: cert_local_path is defined and key_local_path is defined
+      block:
+        - name: Copy certificate file
+          ansible.builtin.copy:
+            src: "{{ cert_local_path }}"
+            dest: "{{ cert_dir }}/wildcard.{{ cert_domain }}.crt"
+            mode: "0600"
+
+        - name: Copy private key file
+          ansible.builtin.copy:
+            src: "{{ key_local_path }}"
+            dest: "{{ cert_dir }}/wildcard.{{ cert_domain }}.key"
+            mode: "0600"
+
+    # Method 2: Write content directly
+    - name: Deploy certificate from content
+      when: cert_content is defined and key_content is defined
+      block:
+        - name: Write certificate content
+          ansible.builtin.copy:
+            content: "{{ cert_content }}"
+            dest: "{{ cert_dir }}/wildcard.{{ cert_domain }}.crt"
+            mode: "0600"
+
+        - name: Write private key content
+          ansible.builtin.copy:
+            content: "{{ key_content }}"
+            dest: "{{ cert_dir }}/wildcard.{{ cert_domain }}.key"
+            mode: "0600"
+
+    - name: Fail if no certificate provided
+      when: (cert_local_path is not defined or key_local_path is not defined) and (cert_content is not defined or key_content is not defined)
+      ansible.builtin.fail:
+        msg: |
+          No certificate provided. Use one of:
+            -e cert_local_path=/path/to/cert.crt -e key_local_path=/path/to/key.key
+            -e cert_content="..." -e key_content="..."
+
+    - name: Verify certificate
+      ansible.builtin.command:
+        cmd: openssl x509 -in {{ cert_dir }}/wildcard.{{ cert_domain }}.crt -noout -subject -dates
+      register: cert_info
+      changed_when: false
+
+    - name: Verify key matches certificate
+      ansible.builtin.shell:
+        cmd: |
+          cert_mod=$(openssl x509 -noout -modulus -in {{ cert_dir }}/wildcard.{{ cert_domain }}.crt | md5sum)
+          key_mod=$(openssl rsa -noout -modulus -in {{ cert_dir }}/wildcard.{{ cert_domain }}.key | md5sum)
+          [ "$cert_mod" = "$key_mod" ] && echo "MATCH" || echo "MISMATCH"
+      register: key_check
+      changed_when: false
+
+    - name: Fail if key doesn't match
+      when: "'MISMATCH' in key_check.stdout"
+      ansible.builtin.fail:
+        msg: "Private key does not match certificate!"
+
+    - name: Show certificate details
+      ansible.builtin.debug:
+        msg:
+          - "Certificate deployed successfully"
+          - "{{ cert_info.stdout_lines }}"
+          - "Key verification: {{ key_check.stdout }}"

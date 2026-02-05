@@ -467,6 +467,27 @@ setup_project_infra() {
         "" "" "$key_vault" \
         "Verification de l'etat des serveurs (connectivity, services)"
 
+    create_template "$project_id" \
+        "Setup - SSH Key" \
+        "${PLAYBOOK_DIR}/setup-ssh-key.yml" \
+        "$inv_id" "$repo_id" "$env_id" \
+        "" "" "" \
+        "Deploie une clef SSH sur serveur vierge (-e ssh_public_key=...)"
+
+    create_template "$project_id" \
+        "Setup - Self-Signed Certificate" \
+        "${PLAYBOOK_DIR}/setup-selfsigned-cert.yml" \
+        "$inv_id" "$repo_id" "$env_id" \
+        "" "" "" \
+        "Genere un certificat SSL auto-signe (-e domain=xxx -e force=true)"
+
+    create_template "$project_id" \
+        "Setup - Wildcard Certificate" \
+        "${PLAYBOOK_DIR}/setup-wildcard-cert.yml" \
+        "$inv_id" "$repo_id" "$env_id" \
+        "" "" "" \
+        "Deploie un certificat wildcard (-e cert_local_path=... -e key_local_path=...)"
+
     log_ok "Projet '${project_name}' configure (${project_id})"
 }
 
@@ -672,7 +693,7 @@ print_summary() {
 
     echo -e "\nProjets crees :" >&2
     echo -e "  ${GREEN}1.${NC} ${PROJECT_INFRA}" >&2
-    echo -e "     Templates : Bootstrap - Server, Bootstrap - Dry Run, Check - Server state" >&2
+    echo -e "     Templates : Bootstrap, Check, Setup SSH Key, Setup Certs (self-signed/wildcard)" >&2
     echo -e "     Keys      : git-toolbox, ssh-servers, vault-password" >&2
     echo "" >&2
     echo -e "  ${GREEN}2.${NC} ${PROJECT_PORTAL}" >&2

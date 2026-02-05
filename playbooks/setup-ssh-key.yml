@@ -1,0 +1,86 @@
+---
+# =============================================================================
+# SETUP-SSH-KEY.YML - Deploie une clef publique SSH sur un serveur vierge
+# =============================================================================
+# Ajoute la clef publique aux authorized_keys de l'utilisateur cible.
+#
+# Usage:
+#   ansible-playbook playbooks/setup-ssh-key.yml -e ssh_public_key="ssh-rsa AAAA..."
+#   ansible-playbook playbooks/setup-ssh-key.yml -e ssh_public_key_file=/path/to/id_rsa.pub
+#
+# Pour plusieurs clefs:
+#   ansible-playbook playbooks/setup-ssh-key.yml \
+#     -e '{"ssh_public_keys": ["ssh-rsa AAA...", "ssh-ed25519 AAA..."]}'
+# =============================================================================
+
+- name: Deploy SSH public key
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    ssh_user: "{{ ansible_user }}"
+    ssh_key_state: present
+
+  tasks:
+    - name: Get user home directory
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ ssh_user }}"
+      register: user_info
+
+    - name: Set home directory fact
+      ansible.builtin.set_fact:
+        user_home: "{{ user_info.ansible_facts.getent_passwd[ssh_user][4] }}"
+
+    - name: Ensure .ssh directory exists
+      ansible.builtin.file:
+        path: "{{ user_home }}/.ssh"
+        state: directory
+        owner: "{{ ssh_user }}"
+        group: "{{ ssh_user }}"
+        mode: "0700"
+
+    # Method 1: Single key from variable
+    - name: Deploy single SSH key from variable
+      when: ssh_public_key is defined
+      ansible.posix.authorized_key:
+        user: "{{ ssh_user }}"
+        key: "{{ ssh_public_key }}"
+        state: "{{ ssh_key_state }}"
+
+    # Method 2: Single key from local file
+    - name: Deploy SSH key from local file
+      when: ssh_public_key_file is defined
+      ansible.posix.authorized_key:
+        user: "{{ ssh_user }}"
+        key: "{{ lookup('file', ssh_public_key_file) }}"
+        state: "{{ ssh_key_state }}"
+
+    # Method 3: Multiple keys
+    - name: Deploy multiple SSH keys
+      when: ssh_public_keys is defined
+      ansible.posix.authorized_key:
+        user: "{{ ssh_user }}"
+        key: "{{ item }}"
+        state: "{{ ssh_key_state }}"
+      loop: "{{ ssh_public_keys }}"
+
+    - name: Fail if no key provided
+      when: ssh_public_key is not defined and ssh_public_key_file is not defined and ssh_public_keys is not defined
+      ansible.builtin.fail:
+        msg: |
+          No SSH key provided. Use one of:
+            -e ssh_public_key="ssh-rsa AAAA..."
+            -e ssh_public_key_file=/path/to/id_rsa.pub
+            -e '{"ssh_public_keys": ["key1", "key2"]}'
+
+    - name: Verify authorized_keys
+      ansible.builtin.command:
+        cmd: wc -l {{ user_home }}/.ssh/authorized_keys
+      register: key_count
+      changed_when: false
+
+    - name: Show result
+      ansible.builtin.debug:
+        msg: "SSH keys configured for {{ ssh_user }}: {{ key_count.stdout }}"

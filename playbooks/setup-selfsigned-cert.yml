@@ -1,0 +1,95 @@
+---
+# =============================================================================
+# SETUP-SELFSIGNED-CERT.YML - Genere un certificat auto-signe
+# =============================================================================
+# Usage:
+#   ansible-playbook playbooks/setup-selfsigned-cert.yml
+#   ansible-playbook playbooks/setup-selfsigned-cert.yml -e domain=example.com
+# =============================================================================
+
+- name: Generate self-signed SSL certificate
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    cert_domain: "{{ domain | default('timox.org') }}"
+    cert_dir: /data/certs
+    cert_days: 365
+
+  tasks:
+    - name: Ensure certs directory exists
+      ansible.builtin.file:
+        path: "{{ cert_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Check if certificate already exists
+      ansible.builtin.stat:
+        path: "{{ cert_dir }}/wildcard.{{ cert_domain }}.crt"
+      register: cert_exists
+
+    - name: Generate self-signed certificate
+      when: not cert_exists.stat.exists or force | default(false) | bool
+      block:
+        - name: Generate private key
+          ansible.builtin.command:
+            cmd: >-
+              openssl genrsa -out {{ cert_dir }}/wildcard.{{ cert_domain }}.key 4096
+            creates: "{{ cert_dir }}/wildcard.{{ cert_domain }}.key"
+
+        - name: Generate CSR config
+          ansible.builtin.copy:
+            dest: "{{ cert_dir }}/wildcard.{{ cert_domain }}.cnf"
+            mode: "0644"
+            content: |
+              [req]
+              default_bits = 4096
+              prompt = no
+              default_md = sha256
+              distinguished_name = dn
+              req_extensions = req_ext
+
+              [dn]
+              CN = *.{{ cert_domain }}
+              O = Lab Environment
+              C = FR
+
+              [req_ext]
+              subjectAltName = @alt_names
+
+              [alt_names]
+              DNS.1 = *.{{ cert_domain }}
+              DNS.2 = {{ cert_domain }}
+
+        - name: Generate self-signed certificate
+          ansible.builtin.command:
+            cmd: >-
+              openssl req -x509 -nodes -days {{ cert_days }}
+              -key {{ cert_dir }}/wildcard.{{ cert_domain }}.key
+              -out {{ cert_dir }}/wildcard.{{ cert_domain }}.crt
+              -config {{ cert_dir }}/wildcard.{{ cert_domain }}.cnf
+              -extensions req_ext
+
+        - name: Set certificate permissions
+          ansible.builtin.file:
+            path: "{{ item }}"
+            mode: "0600"
+          loop:
+            - "{{ cert_dir }}/wildcard.{{ cert_domain }}.key"
+            - "{{ cert_dir }}/wildcard.{{ cert_domain }}.crt"
+
+        - name: Display certificate info
+          ansible.builtin.command:
+            cmd: openssl x509 -in {{ cert_dir }}/wildcard.{{ cert_domain }}.crt -noout -subject -dates
+          register: cert_info
+          changed_when: false
+
+        - name: Show certificate details
+          ansible.builtin.debug:
+            msg: "{{ cert_info.stdout_lines }}"
+
+    - name: Certificate already exists
+      when: cert_exists.stat.exists and not (force | default(false) | bool)
+      ansible.builtin.debug:
+        msg: "Certificate already exists at {{ cert_dir }}/wildcard.{{ cert_domain }}.crt. Use -e force=true to regenerate."
