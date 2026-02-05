@@ -2,17 +2,44 @@
 # =============================================================================
 # SETUP-WILDCARD-CERT.YML - Deploie un certificat wildcard existant
 # =============================================================================
-# Le certificat doit etre fourni via les variables ou fichiers locaux.
+#
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │                    DEPLOIEMENT CERTIFICAT EXISTANT                     │
+# ├─────────────────────────────────────────────────────────────────────────┤
+# │                                                                         │
+# │  QUAND UTILISER :                                                       │
+# │  - Vous avez deja un certificat (achat, autre serveur)                 │
+# │  - Migration depuis une autre machine                                   │
+# │  - Certificat commercial (TBS, DigiCert, etc.)                         │
+# │                                                                         │
+# │  METHODES DE FOURNITURE :                                               │
+# │  ────────────────────────                                               │
+# │    1. Depuis fichiers locaux :                                          │
+# │       -e cert_local_path=/path/to/wildcard.crt                          │
+# │       -e key_local_path=/path/to/wildcard.key                           │
+# │                                                                         │
+# │    2. Depuis contenu (pipeline) :                                       │
+# │       -e cert_content="$(cat wildcard.crt)"                             │
+# │       -e key_content="$(cat wildcard.key)"                              │
+# │                                                                         │
+# │  VARIABLES OPTIONNELLES :                                               │
+# │  ────────────────────────                                               │
+# │    domain : Nom du domaine (defaut: timox.org)                          │
+# │                                                                         │
+# │  FICHIERS DEPLOYES :                                                    │
+# │  ───────────────────                                                    │
+# │    /data/certs/wildcard.{domain}.crt                                    │
+# │    /data/certs/wildcard.{domain}.key                                    │
+# │                                                                         │
+# │  VERIFICATION : Le playbook verifie que la clef correspond au cert     │
+# │                                                                         │
+# └─────────────────────────────────────────────────────────────────────────┘
 #
 # Usage:
 #   ansible-playbook playbooks/setup-wildcard-cert.yml \
-#     -e cert_content="$(cat wildcard.crt)" \
-#     -e key_content="$(cat wildcard.key)"
-#
-# Ou via fichiers locaux:
-#   ansible-playbook playbooks/setup-wildcard-cert.yml \
 #     -e cert_local_path=/path/to/wildcard.crt \
 #     -e key_local_path=/path/to/wildcard.key
+#
 # =============================================================================
 
 - name: Deploy wildcard SSL certificate

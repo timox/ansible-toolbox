@@ -1,12 +1,35 @@
 ---
 # =============================================================================
-# PORTAL-CHECK.YML - Verification de l'etat des services portail
+# PORTAL-CHECK.YML - Diagnostic services Portail Securise
 # =============================================================================
-# Affiche l'etat des containers Docker et les infos deploy.sh --info
+#
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │                     DIAGNOSTIC PORTAIL SECURISE                        │
+# ├─────────────────────────────────────────────────────────────────────────┤
+# │                                                                         │
+# │  INFORMATIONS AFFICHEES :                                               │
+# │  ─────────────────────────                                              │
+# │    - Systeme    : Hostname, OS, uptime, RAM                             │
+# │    - Disque     : Usage / et /data                                      │
+# │    - Docker     : Version, tous les containers (running + stopped)      │
+# │    - Containers : Comptage running/stopped/total                        │
+# │    - deploy.sh  : Sortie de --info si le script existe                  │
+# │    - Reseaux    : Liste des reseaux Docker                              │
+# │                                                                         │
+# │  HOSTS CIBLES : groupe "portal_servers" de l'inventaire                 │
+# │                                                                         │
+# │  CHEMINS RECHERCHES POUR deploy.sh :                                    │
+# │  ────────────────────────────────────                                   │
+# │    /home/{user}/environments/prod/deploy.sh                             │
+# │    /opt/portal/deploy.sh                                                │
+# │    /data/portal/deploy.sh                                               │
+# │                                                                         │
+# └─────────────────────────────────────────────────────────────────────────┘
 #
 # Usage:
 #   ansible-playbook playbooks/portal-check.yml
 #   ansible-playbook playbooks/portal-check.yml --limit vps-ovh
+#
 # =============================================================================
 
 - name: Check portal services status

@@ -2,18 +2,43 @@
 # =============================================================================
 # SETUP-TBSCERTBOT.YML - Certificat commercial TBS Certificats
 # =============================================================================
-# Installe et configure tbscertbot pour gerer les certificats TBS.
-# Documentation : https://www.tbs-certificats.com/FAQ/fr/tbscertbot.html
 #
-# Prerequis:
-#   - Compte client TBS Certificats
-#   - Certificat commande (wildcard ou autre)
-#
-# Variables requises:
-#   - tbs_order_id: numero de commande TBS
-#   - tbs_api_login: login API TBS
-#   - tbs_api_password: mot de passe API TBS
-#   - domain: domaine du certificat
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │                      CERTIFICAT COMMERCIAL TBS                         │
+# ├─────────────────────────────────────────────────────────────────────────┤
+# │                                                                         │
+# │  QUAND UTILISER :                                                       │
+# │  - Production avec certificat commercial                                │
+# │  - Wildcard achete chez TBS Certificats                                 │
+# │  - Besoin de renouvellement automatique                                 │
+# │                                                                         │
+# │  PREREQUIS :                                                            │
+# │  ───────────                                                            │
+# │    1. Compte client TBS Certificats                                     │
+# │    2. Certificat commande (noter le numero de commande)                 │
+# │    3. Credentials API TBS                                               │
+# │                                                                         │
+# │  VARIABLES REQUISES :                                                   │
+# │  ────────────────────                                                   │
+# │    tbs_order_id      : Numero de commande TBS (ex: 123456)              │
+# │    tbs_api_login     : Login API TBS                                    │
+# │    tbs_api_password  : Mot de passe API TBS                             │
+# │    domain            : Domaine du certificat (ex: example.com)          │
+# │                                                                         │
+# │  FICHIERS DEPLOYES :                                                    │
+# │  ───────────────────                                                    │
+# │    /data/certs/wildcard.{domain}.crt       (certificat)                 │
+# │    /data/certs/wildcard.{domain}.key       (clef privee)                │
+# │    /data/certs/wildcard.{domain}.chain.crt (chaine CA)                  │
+# │                                                                         │
+# │  RENOUVELLEMENT :                                                       │
+# │  ────────────────                                                       │
+# │    Cron configure le 1er de chaque mois a 4h                            │
+# │    Script: /usr/local/bin/tbscertbot-renew                              │
+# │                                                                         │
+# │  DOC : https://www.tbs-certificats.com/FAQ/fr/tbscertbot.html          │
+# │                                                                         │
+# └─────────────────────────────────────────────────────────────────────────┘
 #
 # Usage:
 #   ansible-playbook playbooks/setup-tbscertbot.yml \
@@ -21,6 +46,7 @@
 #     -e tbs_api_login=xxx \
 #     -e tbs_api_password=xxx \
 #     -e domain=example.com
+#
 # =============================================================================
 
 - name: Setup TBS Certificats with tbscertbot

@@ -2,15 +2,39 @@
 # =============================================================================
 # SETUP-SSH-KEY.YML - Deploie une clef publique SSH sur un serveur vierge
 # =============================================================================
-# Ajoute la clef publique aux authorized_keys de l'utilisateur cible.
+#
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │                        DEPLOIEMENT CLEF SSH                            │
+# ├─────────────────────────────────────────────────────────────────────────┤
+# │                                                                         │
+# │  QUAND UTILISER :                                                       │
+# │  - Premier acces a un serveur neuf                                      │
+# │  - Ajouter une clef supplementaire                                      │
+# │  - Remplacer les clefs existantes                                       │
+# │                                                                         │
+# │  METHODES DE FOURNITURE :                                               │
+# │  ────────────────────────                                               │
+# │    1. Directement en variable :                                         │
+# │       -e ssh_public_key="ssh-rsa AAAA..."                               │
+# │                                                                         │
+# │    2. Depuis un fichier local :                                         │
+# │       -e ssh_public_key_file=/path/to/id_rsa.pub                        │
+# │                                                                         │
+# │    3. Plusieurs clefs (JSON) :                                          │
+# │       -e '{"ssh_public_keys": ["ssh-rsa ...", "ssh-ed25519 ..."]}'      │
+# │                                                                         │
+# │  VARIABLES OPTIONNELLES :                                               │
+# │  ────────────────────────                                               │
+# │    ssh_user      : Utilisateur cible (defaut: ansible_user)             │
+# │    ssh_key_state : present/absent (defaut: present)                     │
+# │                                                                         │
+# └─────────────────────────────────────────────────────────────────────────┘
 #
 # Usage:
 #   ansible-playbook playbooks/setup-ssh-key.yml -e ssh_public_key="ssh-rsa AAAA..."
-#   ansible-playbook playbooks/setup-ssh-key.yml -e ssh_public_key_file=/path/to/id_rsa.pub
+#   ansible-playbook playbooks/setup-ssh-key.yml -e ssh_public_key_file=~/.ssh/id_rsa.pub
+#   ansible-playbook playbooks/setup-ssh-key.yml --ask-pass -e ssh_public_key="..."
 #
-# Pour plusieurs clefs:
-#   ansible-playbook playbooks/setup-ssh-key.yml \
-#     -e '{"ssh_public_keys": ["ssh-rsa AAA...", "ssh-ed25519 AAA..."]}'
 # =============================================================================
 
 - name: Deploy SSH public key

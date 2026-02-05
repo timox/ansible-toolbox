@@ -2,17 +2,42 @@
 # =============================================================================
 # BACKUP-CISCO.YML - Sauvegarde configs Cisco IOS/IOS-XE
 # =============================================================================
-# Recupere les running-config des switchs Cisco et commit dans Git
+#
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │                      BACKUP CONFIGURATIONS CISCO                       │
+# ├─────────────────────────────────────────────────────────────────────────┤
+# │                                                                         │
+# │  ACTIONS EFFECTUEES :                                                   │
+# │  ────────────────────                                                   │
+# │    1. Connexion SSH aux equipements Cisco                               │
+# │    2. Recuperation running-config                                       │
+# │    3. Sauvegarde locale avec horodatage                                 │
+# │    4. Commit et push Git (optionnel)                                    │
+# │                                                                         │
+# │  PREREQUIS :                                                            │
+# │  ───────────                                                            │
+# │    ansible-galaxy collection install -r requirements.yml                │
+# │    (cisco.ios, ansible.netcommon)                                       │
+# │                                                                         │
+# │  CREDENTIALS :                                                          │
+# │  ─────────────                                                          │
+# │    Methode 1 - Semaphore Key Store :                                    │
+# │      Creer une clef "cisco" de type Login (user/password)               │
+# │                                                                         │
+# │    Methode 2 - Variables extra :                                        │
+# │      -e ansible_user=admin -e ansible_password=secret                   │
+# │                                                                         │
+# │  VARIABLES :                                                            │
+# │  ───────────                                                            │
+# │    cisco_backup_git_push : Push vers Git (defaut: true)                 │
+# │                                                                         │
+# └─────────────────────────────────────────────────────────────────────────┘
 #
 # Usage:
 #   ansible-playbook playbooks/backup-cisco.yml
-#   ansible-playbook playbooks/backup-cisco.yml --check
 #   ansible-playbook playbooks/backup-cisco.yml --limit sw-core-01
 #   ansible-playbook playbooks/backup-cisco.yml -e cisco_backup_git_push=false
 #
-# Prerequis:
-#   ansible-galaxy collection install -r requirements.yml
-#   Credentials dans Semaphore Key Store ou -e ansible_user=xxx -e ansible_password=xxx
 # =============================================================================
 
 - name: Backup Cisco IOS/IOS-XE running-config

@@ -2,14 +2,44 @@
 # =============================================================================
 # PORTAL-DESTROY.YML - Suppression d'un ou tous les services
 # =============================================================================
-# Equivalent de deploy.sh --destroy-all
+#
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │    ⚠️  ATTENTION : SUPPRESSION DE SERVICES ET DONNEES                  │
+# ├─────────────────────────────────────────────────────────────────────────┤
+# │                                                                         │
+# │  EQUIVALENT DE : deploy.sh --destroy-all                                │
+# │                                                                         │
+# │  VARIABLES REQUISES :                                                   │
+# │  ─────────────────────                                                  │
+# │    service : Nom du service OU "all" pour tout supprimer                │
+# │    confirm : Doit etre "true" (protection contre erreurs)               │
+# │                                                                         │
+# │  SERVICES SUPPRIMABLES :                                                │
+# │  ────────────────────────                                               │
+# │    all (TOUT)  : Supprime TOUS les services et donnees                  │
+# │    keycloak    : Identity Provider + base de donnees                    │
+# │    oauth2-proxy: Auth proxy + nginx + sessions Redis                    │
+# │    guacamole   : Bastion + base de donnees                              │
+# │    vaultwarden : Coffre-fort + donnees                                  │
+# │    headscale   : VPN + configuration                                    │
+# │    linshare    : Partage fichiers + MongoDB + uploads                   │
+# │    bookstack   : Wiki + base de donnees                                 │
+# │                                                                         │
+# │  ORDRE DE SUPPRESSION (service=all) :                                   │
+# │  ─────────────────────────────────────                                  │
+# │    Inverse du deploiement pour eviter les dependances cassees           │
+# │    bookstack → linshare → headscale → vaultwarden → portal_api →        │
+# │    credentials_api → guacamole → oauth2_proxy → keycloak                │
+# │                                                                         │
+# └─────────────────────────────────────────────────────────────────────────┘
 #
 # Usage:
 #   # Supprimer un service
 #   ansible-playbook playbooks/portal-destroy.yml -e service=linshare -e confirm=true
 #
-#   # Supprimer TOUS les services (DANGEREUX)
+#   # Supprimer TOUS les services (DANGEREUX - PERTE DE DONNEES)
 #   ansible-playbook playbooks/portal-destroy.yml -e service=all -e confirm=true
+#
 # =============================================================================
 
 - name: "Destroy service: {{ service | default('UNDEFINED') }}"

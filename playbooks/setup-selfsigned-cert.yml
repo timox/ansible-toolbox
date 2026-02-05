@@ -1,10 +1,38 @@
 ---
 # =============================================================================
-# SETUP-SELFSIGNED-CERT.YML - Genere un certificat auto-signe
+# SETUP-SELFSIGNED-CERT.YML - Genere un certificat wildcard auto-signe
 # =============================================================================
+#
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │                         CERTIFICAT AUTO-SIGNE                          │
+# ├─────────────────────────────────────────────────────────────────────────┤
+# │                                                                         │
+# │  QUAND UTILISER :                                                       │
+# │  - Environnement de dev/test                                            │
+# │  - Pas de nom de domaine public                                         │
+# │  - Besoin immediat de HTTPS                                             │
+# │                                                                         │
+# │  LIMITATIONS :                                                          │
+# │  - Les navigateurs affichent un avertissement de securite              │
+# │  - Non valide pour la production publique                               │
+# │                                                                         │
+# │  VARIABLES :                                                            │
+# │  ──────────                                                             │
+# │    domain       : Domaine du certificat (defaut: timox.org)             │
+# │    force        : Regenerer meme si existant (defaut: false)            │
+# │                                                                         │
+# │  FICHIERS GENERES :                                                     │
+# │  ─────────────────                                                      │
+# │    /data/certs/wildcard.{domain}.crt  (certificat)                      │
+# │    /data/certs/wildcard.{domain}.key  (clef privee)                     │
+# │                                                                         │
+# └─────────────────────────────────────────────────────────────────────────┘
+#
 # Usage:
 #   ansible-playbook playbooks/setup-selfsigned-cert.yml
 #   ansible-playbook playbooks/setup-selfsigned-cert.yml -e domain=example.com
+#   ansible-playbook playbooks/setup-selfsigned-cert.yml -e force=true
+#
 # =============================================================================
 
 - name: Generate self-signed SSL certificate

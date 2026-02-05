@@ -2,16 +2,41 @@
 # =============================================================================
 # DEPLOY-ZABBIX-AGENT.YML - Deploiement Zabbix Agent 2 (v7.0)
 # =============================================================================
-# Installe et configure Zabbix Agent 2 avec scripts de monitoring
+#
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │                       DEPLOIEMENT ZABBIX AGENT 2                       │
+# ├─────────────────────────────────────────────────────────────────────────┤
+# │                                                                         │
+# │  ACTIONS EFFECTUEES :                                                   │
+# │  ────────────────────                                                   │
+# │    1. Ajout depot Zabbix officiel                                       │
+# │    2. Installation zabbix-agent2                                        │
+# │    3. Configuration (serveur, hostname, etc.)                           │
+# │    4. Deploiement scripts de monitoring custom                          │
+# │    5. Demarrage et activation du service                                │
+# │                                                                         │
+# │  VARIABLE REQUISE :                                                     │
+# │  ───────────────────                                                    │
+# │    zabbix_agent_server : IP ou hostname du serveur Zabbix               │
+# │                          (ex: 10.0.0.50 ou zabbix.local)                │
+# │                                                                         │
+# │  VARIABLES OPTIONNELLES (role defaults) :                               │
+# │  ─────────────────────────────────────────                              │
+# │    zabbix_agent_hostname    : Hostname visible dans Zabbix              │
+# │    zabbix_agent_listen_port : Port d'ecoute (defaut: 10050)             │
+# │                                                                         │
+# │  TAGS DISPONIBLES :                                                     │
+# │  ───────────────────                                                    │
+# │    zabbix-agent         : Installation complete                         │
+# │    zabbix-agent-scripts : Scripts custom uniquement                     │
+# │                                                                         │
+# └─────────────────────────────────────────────────────────────────────────┘
 #
 # Usage:
 #   ansible-playbook playbooks/deploy-zabbix-agent.yml
 #   ansible-playbook playbooks/deploy-zabbix-agent.yml --check --diff
 #   ansible-playbook playbooks/deploy-zabbix-agent.yml --limit srv-web-01
-#   ansible-playbook playbooks/deploy-zabbix-agent.yml --tags zabbix-agent-scripts
 #
-# Variables obligatoires:
-#   zabbix_agent_server: IP ou hostname du serveur Zabbix
 # =============================================================================
 
 - name: Deploy Zabbix Agent 2

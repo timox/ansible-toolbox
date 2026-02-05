@@ -1,9 +1,30 @@
 ---
 # ============================================================================
-# Check playbook - Verify server connectivity and state
+# CHECK.YML - Verification etat serveur (diagnostic rapide)
 # ============================================================================
+#
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │                        DIAGNOSTIC SERVEUR                              │
+# ├─────────────────────────────────────────────────────────────────────────┤
+# │                                                                         │
+# │  INFORMATIONS AFFICHEES :                                               │
+# │  ─────────────────────────                                              │
+# │    - Systeme   : Hostname, OS, kernel, uptime                           │
+# │    - Reseau    : IP principale                                          │
+# │    - Ressources: RAM libre/totale, swap                                 │
+# │    - Disque    : Usage partition /                                      │
+# │    - Docker    : Version, containers en cours                           │
+# │    - SSH       : Methodes d'authentification actives                    │
+# │    - Donnees   : Etat des repertoires /data/*                           │
+# │                                                                         │
+# │  HOSTS CIBLES : groupe "remote" de l'inventaire                         │
+# │                                                                         │
+# └─────────────────────────────────────────────────────────────────────────┘
+#
 # Usage:
 #   ansible-playbook playbooks/check.yml
+#   ansible-playbook playbooks/check.yml --limit vps-ovh
+#
 # ============================================================================
 
 - name: Check server state

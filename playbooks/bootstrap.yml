@@ -1,22 +1,53 @@
 ---
 # ============================================================================
-# Bootstrap playbook - Prepare a fresh server
+# BOOTSTRAP.YML - Prepare un serveur vierge
 # ============================================================================
+#
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │                      BOOTSTRAP SERVEUR NEUF                            │
+# ├─────────────────────────────────────────────────────────────────────────┤
+# │                                                                         │
+# │  ACTIONS EFFECTUEES :                                                   │
+# │  ────────────────────                                                   │
+# │    1. Deploiement clef SSH (si bootstrap_ssh_public_key defini)         │
+# │    2. Installation paquets de base                                      │
+# │    3. Configuration systeme (timezone, hostname, locale)                │
+# │    4. Creation repertoires /data/*                                      │
+# │    5. Hardening SSH (desactive mdp, port custom)                        │
+# │    6. Installation Docker + Docker Compose                              │
+# │                                                                         │
+# │  VARIABLES IMPORTANTES (defaults/main.yml des roles) :                  │
+# │  ──────────────────────────────────────────────────────                 │
+# │    bootstrap_ssh_public_key : Clef SSH a deployer (optionnel)           │
+# │    bootstrap_timezone       : Timezone (defaut: Europe/Paris)           │
+# │    bootstrap_hostname       : Hostname (defaut: inventory_hostname)     │
+# │    bootstrap_ssh_port       : Port SSH (defaut: 22)                     │
+# │                                                                         │
+# │  TAGS DISPONIBLES :                                                     │
+# │  ───────────────────                                                    │
+# │    bootstrap   : Configuration systeme complete                         │
+# │    docker      : Installation Docker uniquement                         │
+# │    hardening   : Hardening SSH uniquement                               │
+# │    ssh         : Deploiement clef SSH uniquement                        │
+# │                                                                         │
+# └─────────────────────────────────────────────────────────────────────────┘
+#
 # Usage:
-#   First run (password auth):
-#     ansible-playbook playbooks/bootstrap.yml --ask-pass
+#   # Premier run (authentification par mot de passe)
+#   ansible-playbook playbooks/bootstrap.yml --ask-pass
 #
-#   Subsequent runs (key auth):
-#     ansible-playbook playbooks/bootstrap.yml
+#   # Runs suivants (authentification par clef)
+#   ansible-playbook playbooks/bootstrap.yml
 #
-#   Dry run:
-#     ansible-playbook playbooks/bootstrap.yml --check --diff
+#   # Dry run
+#   ansible-playbook playbooks/bootstrap.yml --check --diff
 #
-#   Skip hardening (first run, key only):
-#     ansible-playbook playbooks/bootstrap.yml --ask-pass --skip-tags hardening
+#   # Docker uniquement
+#   ansible-playbook playbooks/bootstrap.yml --tags docker
 #
-#   Docker only:
-#     ansible-playbook playbooks/bootstrap.yml --tags docker
+#   # Sans hardening SSH (premier run, garder acces mot de passe)
+#   ansible-playbook playbooks/bootstrap.yml --ask-pass --skip-tags hardening
+#
 # ============================================================================
 
 - name: Bootstrap server

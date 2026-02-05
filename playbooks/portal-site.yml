@@ -1,26 +1,51 @@
 ---
 # =============================================================================
-# PORTAL-SITE.YML - Playbook master de deploiement complet
+# PORTAL-SITE.YML - Deploiement complet du Portail Securise
 # =============================================================================
-# Equivalent de deploy.sh - deploie toute l'infrastructure portail
+#
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │                 DEPLOIEMENT PORTAIL SECURISE COMPLET                   │
+# ├─────────────────────────────────────────────────────────────────────────┤
+# │                                                                         │
+# │  EQUIVALENT DE : deploy.sh (sans arguments)                             │
+# │                                                                         │
+# │  ORDRE DE DEPLOIEMENT :                                                 │
+# │  ───────────────────────                                                │
+# │    Phase 1 - Infrastructure :                                           │
+# │      common       : Prereqs, certs, secrets, networks Docker            │
+# │                                                                         │
+# │    Phase 2 - Identity Provider :                                        │
+# │      keycloak     : Authentification OIDC (requis par tous)             │
+# │                                                                         │
+# │    Phase 3 - Services Core :                                            │
+# │      oauth2_proxy : Auth proxy + nginx reverse proxy                    │
+# │                                                                         │
+# │    Phase 4 - Applications Core :                                        │
+# │      guacamole    : Bastion RDP/SSH/VNC                                 │
+# │      credentials  : API stockage mots de passe                          │
+# │      portal_api   : Portail web + API                                   │
+# │                                                                         │
+# │    Phase 5 - Services Optionnels :                                      │
+# │      vaultwarden  : Gestionnaire mots de passe (si DEPLOY_VAULTWARDEN)  │
+# │      headscale    : VPN mesh (si DEPLOY_HEADSCALE)                      │
+# │      linshare     : Partage fichiers (si DEPLOY_LINSHARE)               │
+# │      bookstack    : Wiki (si DEPLOY_BOOKSTACK)                          │
+# │                                                                         │
+# │  TAGS DISPONIBLES :                                                     │
+# │  ───────────────────                                                    │
+# │    core      : Phases 1-4 uniquement                                    │
+# │    identity  : Keycloak uniquement                                      │
+# │    optional  : Services optionnels uniquement                           │
+# │    <service> : Un service specifique (ex: guacamole, headscale)         │
+# │                                                                         │
+# └─────────────────────────────────────────────────────────────────────────┘
 #
 # Usage:
-#   ansible-playbook playbooks/portal-site.yml                    # Deploiement complet
-#   ansible-playbook playbooks/portal-site.yml --tags core        # Services core uniquement
-#   ansible-playbook playbooks/portal-site.yml --tags keycloak    # Keycloak seul
-#   ansible-playbook playbooks/portal-site.yml --check --diff     # Dry run
+#   ansible-playbook playbooks/portal-site.yml                  # Complet
+#   ansible-playbook playbooks/portal-site.yml --tags core      # Core only
+#   ansible-playbook playbooks/portal-site.yml --tags keycloak  # Keycloak seul
+#   ansible-playbook playbooks/portal-site.yml --check --diff   # Dry run
 #
-# Ordre de deploiement:
-#   1. common       (prereqs, certs, secrets, networks)
-#   2. keycloak     (identity provider - requis par tous les services OIDC)
-#   3. oauth2_proxy (auth + nginx reverse proxy)
-#   4. guacamole    (bastion RDP/SSH/VNC)
-#   5. credentials_api (stockage mots de passe)
-#   6. portal_api   (portail web + API)
-#   7. vaultwarden  (gestionnaire mots de passe)
-#   8. headscale    (VPN mesh)
-#   9. linshare     (partage fichiers)
-#  10. bookstack    (wiki)
 # =============================================================================
 
 - name: Deploy Portail Securise - Infrastructure complete

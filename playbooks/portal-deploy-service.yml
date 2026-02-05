@@ -2,17 +2,40 @@
 # =============================================================================
 # PORTAL-DEPLOY-SERVICE.YML - Deploiement d'un service individuel
 # =============================================================================
-# Equivalent de deploy.sh --service <nom>
+#
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │                    DEPLOIEMENT SERVICE INDIVIDUEL                      │
+# ├─────────────────────────────────────────────────────────────────────────┤
+# │                                                                         │
+# │  EQUIVALENT DE : deploy.sh --service <nom>                              │
+# │                                                                         │
+# │  VARIABLE REQUISE :                                                     │
+# │  ───────────────────                                                    │
+# │    service : Nom du service a deployer                                  │
+# │                                                                         │
+# │  SERVICES DISPONIBLES :                                                 │
+# │  ───────────────────────                                                │
+# │    keycloak       : Identity Provider OIDC                              │
+# │    oauth2-proxy   : Auth proxy + nginx                                  │
+# │    guacamole      : Bastion RDP/SSH/VNC                                 │
+# │    credentials-api: API stockage mots de passe                          │
+# │    portal-api     : Portail web + API                                   │
+# │    vaultwarden    : Gestionnaire mots de passe                          │
+# │    headscale      : VPN mesh Tailscale                                  │
+# │    linshare       : Partage de fichiers                                 │
+# │    bookstack      : Wiki                                                │
+# │                                                                         │
+# │  VARIABLE OPTIONNELLE :                                                 │
+# │  ───────────────────────                                                │
+# │    force : Forcer le redeploiement (defaut: false)                      │
+# │                                                                         │
+# └─────────────────────────────────────────────────────────────────────────┘
 #
 # Usage:
 #   ansible-playbook playbooks/portal-deploy-service.yml -e service=keycloak
 #   ansible-playbook playbooks/portal-deploy-service.yml -e service=vaultwarden
-#   ansible-playbook playbooks/portal-deploy-service.yml -e service=linshare
 #   ansible-playbook playbooks/portal-deploy-service.yml -e service=headscale -e force=true
 #
-# Services disponibles:
-#   keycloak, oauth2-proxy, guacamole, credentials-api, portal-api,
-#   vaultwarden, headscale, linshare, bookstack
 # =============================================================================
 
 - name: "Deploy service: {{ service | default('UNDEFINED') }}"
