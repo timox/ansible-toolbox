@@ -1,0 +1,103 @@
+---
+# =============================================================================
+# RUNDECK - Runbook Automation
+# =============================================================================
+# Alternative à Semaphore avec plus de fonctionnalités UI
+#
+# Usage:
+#   cp .env.example .env
+#   # Editer .env avec vos valeurs
+#   docker compose up -d
+#
+# Accès: http://localhost:4440
+# Login par défaut: admin / admin (changer dans .env)
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL Database
+  # ---------------------------------------------------------------------------
+  rundeck-db:
+    image: postgres:16-alpine
+    container_name: rundeck-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${RUNDECK_DB_NAME:-rundeck}
+      POSTGRES_USER: ${RUNDECK_DB_USER:-rundeck}
+      POSTGRES_PASSWORD: ${RUNDECK_DB_PASS:?RUNDECK_DB_PASS required}
+    volumes:
+      - rundeck-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${RUNDECK_DB_USER:-rundeck} -d ${RUNDECK_DB_NAME:-rundeck}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - rundeck-net
+
+  # ---------------------------------------------------------------------------
+  # Rundeck Server
+  # ---------------------------------------------------------------------------
+  rundeck:
+    image: rundeck/rundeck:${RUNDECK_VERSION:-5.19.0}
+    container_name: rundeck
+    restart: unless-stopped
+    depends_on:
+      rundeck-db:
+        condition: service_healthy
+    environment:
+      # --- Server URL ---
+      RUNDECK_GRAILS_URL: ${RUNDECK_URL:-http://localhost:4440}
+      RUNDECK_SERVER_ADDRESS: 0.0.0.0
+
+      # --- Database ---
+      RUNDECK_DATABASE_DRIVER: org.postgresql.Driver
+      RUNDECK_DATABASE_URL: jdbc:postgresql://rundeck-db:5432/${RUNDECK_DB_NAME:-rundeck}
+      RUNDECK_DATABASE_USERNAME: ${RUNDECK_DB_USER:-rundeck}
+      RUNDECK_DATABASE_PASSWORD: ${RUNDECK_DB_PASS:?RUNDECK_DB_PASS required}
+
+      # --- Admin User ---
+      RUNDECK_ADMIN_USER: ${RUNDECK_ADMIN_USER:-admin}
+      RUNDECK_ADMIN_PASSWORD: ${RUNDECK_ADMIN_PASS:-admin}
+
+      # --- UI Settings ---
+      RUNDECK_FEATURE_UINEXT_NAME: uiNext
+      RUNDECK_FEATURE_UINEXT_ENABLED: "true"
+
+      # --- Security ---
+      RUNDECK_SECURITY_HTTPHEADERS_PROVIDER_CSP_ENABLED: "false"
+
+      # --- Logging ---
+      RUNDECK_LOGGING_STRATEGY: CONSOLE
+
+    volumes:
+      # Persistent data
+      - rundeck-data:/home/rundeck/server/data
+      - rundeck-logs:/home/rundeck/var/logs
+      # SSH keys for connecting to nodes
+      - rundeck-ssh:/home/rundeck/.ssh
+      # Projects definitions
+      - rundeck-projects:/home/rundeck/projects
+      # Ansible inventory and playbooks (mount ansible-toolbox)
+      - ${ANSIBLE_TOOLBOX_PATH:-..}:/home/rundeck/ansible-toolbox:ro
+    ports:
+      - "${RUNDECK_PORT:-4440}:4440"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4440/api/14/system/info"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    networks:
+      - rundeck-net
+
+volumes:
+  rundeck-db-data:
+  rundeck-data:
+  rundeck-logs:
+  rundeck-ssh:
+  rundeck-projects:
+
+networks:
+  rundeck-net:
+    driver: bridge
