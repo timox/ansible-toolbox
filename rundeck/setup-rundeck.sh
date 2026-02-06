@@ -144,15 +144,15 @@ create_project() {
     "description": "${project_desc}",
     "config": {
         "project.description": "${project_desc}",
-        "resources.source.1.type": "com.rundeck.plugins.ansible.plugin.AnsibleResourceModelSourceFactory",
+        "resources.source.1.type": "com.batix.rundeck.plugins.AnsibleResourceModelSourceFactory",
         "resources.source.1.config.ansible-inventory": "${ANSIBLE_BASE}/inventory/hosts.yml",
         "resources.source.1.config.ansible-config-file-path": "${ANSIBLE_BASE}/ansible.cfg",
         "resources.source.1.config.ansible-gather-facts": "false",
         "resources.source.1.config.ansible-ignore-errors": "true",
-        "service.NodeExecutor.default.provider": "com.rundeck.plugins.ansible.plugin.AnsibleNodeExecutor",
-        "project.plugin.NodeExecutor.com.rundeck.plugins.ansible.plugin.AnsibleNodeExecutor.ansible-config-file-path": "${ANSIBLE_BASE}/ansible.cfg",
-        "service.FileCopier.default.provider": "com.rundeck.plugins.ansible.plugin.AnsibleFileCopier",
-        "project.plugin.FileCopier.com.rundeck.plugins.ansible.plugin.AnsibleFileCopier.ansible-config-file-path": "${ANSIBLE_BASE}/ansible.cfg"
+        "service.NodeExecutor.default.provider": "com.batix.rundeck.plugins.AnsibleNodeExecutor",
+        "project.plugin.NodeExecutor.com.batix.rundeck.plugins.AnsibleNodeExecutor.ansible-config-file-path": "${ANSIBLE_BASE}/ansible.cfg",
+        "service.FileCopier.default.provider": "com.batix.rundeck.plugins.AnsibleFileCopier",
+        "project.plugin.FileCopier.com.batix.rundeck.plugins.AnsibleFileCopier.ansible-config-file-path": "${ANSIBLE_BASE}/ansible.cfg"
     }
 }
 EOF
