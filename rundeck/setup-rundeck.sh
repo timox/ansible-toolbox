@@ -144,11 +144,12 @@ create_project() {
     "description": "${project_desc}",
     "config": {
         "project.description": "${project_desc}",
-        "resources.source.1.type": "com.batix.rundeck.plugins.AnsibleResourceModelSourceFactory",
-        "resources.source.1.config.ansible-inventory": "${ANSIBLE_BASE}/inventory/hosts.yml",
-        "resources.source.1.config.ansible-config-file-path": "${ANSIBLE_BASE}/ansible.cfg",
-        "resources.source.1.config.ansible-gather-facts": "false",
-        "resources.source.1.config.ansible-ignore-errors": "true",
+        "resources.source.1.type": "local",
+        "resources.source.2.type": "com.batix.rundeck.plugins.AnsibleResourceModelSourceFactory",
+        "resources.source.2.config.ansible-inventory": "${ANSIBLE_BASE}/inventory/hosts.yml",
+        "resources.source.2.config.ansible-config-file-path": "${ANSIBLE_BASE}/ansible.cfg",
+        "resources.source.2.config.ansible-gather-facts": "false",
+        "resources.source.2.config.ansible-ignore-errors": "true",
         "service.NodeExecutor.default.provider": "com.batix.rundeck.plugins.AnsibleNodeExecutor",
         "project.plugin.NodeExecutor.com.batix.rundeck.plugins.AnsibleNodeExecutor.ansible-config-file-path": "${ANSIBLE_BASE}/ansible.cfg",
         "service.FileCopier.default.provider": "com.batix.rundeck.plugins.AnsibleFileCopier",
@@ -180,20 +181,29 @@ create_job() {
 
     log_info "  → Job: $job_name"
 
-    # Utiliser exec script pour appeler ansible-playbook directement
+    # Script inline pour exécuter ansible-playbook sur le serveur local
     local job_yaml
     job_yaml=$(cat <<EOF
 - name: ${job_name}
   description: "${job_desc}"
   project: ${project_name}
   loglevel: INFO
-  nodeFilterEditable: false
   executionEnabled: true
+  nodefilters:
+    dispatch:
+      threadcount: 1
+      keepgoing: false
+    filter: 'name: .*'
+  nodesSelectedByDefault: true
   sequence:
     keepgoing: false
-    strategy: sequential
+    strategy: node-first
     commands:
-    - exec: ansible-playbook -i ${ANSIBLE_BASE}/inventory/hosts.yml ${playbook_path}
+    - script: |
+        #!/bin/bash
+        set -e
+        cd ${ANSIBLE_BASE}
+        ansible-playbook -i inventory/hosts.yml ${playbook_path}
 EOF
 )
 
