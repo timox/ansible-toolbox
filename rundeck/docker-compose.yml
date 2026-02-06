@@ -1,16 +1,17 @@
 ---
 # =============================================================================
-# RUNDECK - Runbook Automation
+# RUNDECK - Runbook Automation (avec Ansible pre-installe)
 # =============================================================================
-# Alternative à Semaphore avec plus de fonctionnalités UI
+# Image salvoxia/rundeck inclut : Python 3, Ansible, JMESPath
+# https://github.com/Salvoxia/docker-rundeck
 #
 # Usage:
 #   cp .env.example .env
 #   # Editer .env avec vos valeurs
 #   docker compose up -d
 #
-# Accès: http://localhost:4440
-# Login par défaut: admin / admin (changer dans .env)
+# Acces: http://localhost:4440
+# Login par defaut: admin / admin
 # =============================================================================
 
 services:
@@ -36,10 +37,10 @@ services:
       - rundeck-net
 
   # ---------------------------------------------------------------------------
-  # Rundeck Server
+  # Rundeck Server (avec Ansible)
   # ---------------------------------------------------------------------------
   rundeck:
-    image: rundeck/rundeck:${RUNDECK_VERSION:-5.19.0}
+    image: salvoxia/rundeck:${RUNDECK_VERSION:-6.5.18.0}
     container_name: rundeck
     restart: unless-stopped
     depends_on:
@@ -55,10 +56,6 @@ services:
       RUNDECK_DATABASE_URL: jdbc:postgresql://rundeck-db:5432/${RUNDECK_DB_NAME:-rundeck}
       RUNDECK_DATABASE_USERNAME: ${RUNDECK_DB_USER:-rundeck}
       RUNDECK_DATABASE_PASSWORD: ${RUNDECK_DB_PASS:?RUNDECK_DB_PASS required}
-
-      # --- Admin User ---
-      RUNDECK_ADMIN_USER: ${RUNDECK_ADMIN_USER:-admin}
-      RUNDECK_ADMIN_PASSWORD: ${RUNDECK_ADMIN_PASS:-admin}
 
       # --- UI Settings ---
       RUNDECK_FEATURE_UINEXT_NAME: uiNext
@@ -82,12 +79,6 @@ services:
       - ${ANSIBLE_TOOLBOX_PATH:-..}:/home/rundeck/ansible-toolbox:ro
     ports:
       - "${RUNDECK_PORT:-4440}:4440"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4440/api/14/system/info"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 120s
     networks:
       - rundeck-net
 
