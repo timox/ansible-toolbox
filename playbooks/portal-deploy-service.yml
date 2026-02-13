@@ -48,11 +48,12 @@
         that:
           - service is defined
           - service in ['keycloak', 'oauth2-proxy', 'guacamole', 'credentials-api',
-                        'portal-api', 'vaultwarden', 'headscale', 'linshare', 'bookstack']
+                        'portal-api', 'vaultwarden', 'headscale', 'linshare', 'bookstack',
+                        'professeur']
         fail_msg: >
           Service '{{ service | default("UNDEFINED") }}' invalide.
           Services disponibles: keycloak, oauth2-proxy, guacamole, credentials-api,
-          portal-api, vaultwarden, headscale, linshare, bookstack
+          portal-api, vaultwarden, headscale, linshare, bookstack, professeur
 
   roles:
     - role: common
@@ -84,3 +85,6 @@
 
     - role: bookstack
       when: service == 'bookstack'
+
+    - role: professeur
+      when: service == 'professeur'
