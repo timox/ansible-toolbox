@@ -1,0 +1,7 @@
+---
+- name: Deploy Le Professeur
+  ansible.builtin.include_tasks: deploy.yml
+  when: deploy_professeur | bool
+  tags:
+    - professeur
+    - professeur-deploy

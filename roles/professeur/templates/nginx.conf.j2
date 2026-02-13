@@ -1,0 +1,27 @@
+server {
+    listen 80;
+    server_name _;
+
+    location /obs/ {
+        proxy_pass http://rdr-observation:3000/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /api/ {
+        proxy_pass http://rdr-observation:3000/api/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location / {
+        fastcgi_pass psychotopia-webapp:9000;
+        fastcgi_param SCRIPT_FILENAME /app/public/index.php;
+        include fastcgi_params;
+        fastcgi_param DOCUMENT_ROOT /app/public;
+    }
+}

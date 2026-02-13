@@ -1,0 +1,68 @@
+---
+- name: Validate professeur state variable
+  ansible.builtin.assert:
+    that:
+      - professeur_state in ['present', 'absent']
+    fail_msg: "professeur_state must be 'present' or 'absent'"
+
+- name: Clone le-professeur repository
+  ansible.builtin.git:
+    repo: "https://github.com/timox/le-professeur.git"
+    dest: "{{ prod_dir }}/professeur/src"
+    version: main
+    force: true
+  when: professeur_state == 'present'
+
+- name: Ensure directories exist
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner | default('root') }}"
+    mode: "{{ item.mode | default('0755') }}"
+  loop:
+    - path: /data/professeur/mariadb
+      owner: "999"
+    - path: /data/professeur/sqlite
+      owner: "1000"
+    - path: "{{ prod_dir }}/professeur/nginx"
+  when: professeur_state == 'present'
+
+- name: Generate Professeur configs
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    mode: "{{ item.mode | default('0644') }}"
+  loop:
+    - src: docker-compose.yml.j2
+      dest: "{{ prod_dir }}/professeur/docker-compose.yml"
+    - src: .env.j2
+      dest: "{{ prod_dir }}/professeur/.env"
+      mode: "0600"
+    - src: nginx.conf.j2
+      dest: "{{ prod_dir }}/professeur/nginx/default.conf"
+  when: professeur_state == 'present'
+
+- name: Deploy Le Professeur via Docker Compose
+  community.docker.docker_compose_v2:
+    project_src: "{{ prod_dir }}/professeur"
+    project_name: "{{ professeur_project_name }}"
+    env_files:
+      - "{{ prod_dir }}/professeur/.env"
+    state: "{{ professeur_state }}"
+    build: always
+  register: professeur_deploy
+
+- name: Wait for Le Professeur to be healthy
+  ansible.builtin.uri:
+    url: "http://localhost:{{ professeur_port }}/obs/"
+    status_code: 200
+  register: professeur_health
+  until: professeur_health.status == 200
+  retries: 30
+  delay: 10
+  when: professeur_state == 'present'
+  changed_when: false
+
+- name: Display Le Professeur deployment status
+  ansible.builtin.debug:
+    msg: "Le Professeur is {{ 'deployed and healthy' if professeur_state == 'present' else 'removed' }}"
