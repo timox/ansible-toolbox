@@ -2,9 +2,10 @@
 # ==============================================================================
 # setup-semaphore.sh - Provision des projets Semaphore via API
 #
-# Cree 4 projets avec keys, repository, inventaire, environnement et templates :
+# Cree 5 projets avec keys, repository, inventaire, environnement et templates :
 #   - Infrastructure       : bootstrap, check serveurs
 #   - Portail Securise     : deploy/destroy stack portail
+#   - Le Professeur        : deploy app reduction des risques
 #   - Monitoring           : Zabbix agent
 #   - Network Backup       : sauvegarde configs Cisco
 #
@@ -42,6 +43,7 @@ PROJECT_INFRA="${PROJECT_INFRA:-Infrastructure}"
 PROJECT_PORTAL="${PROJECT_PORTAL:-Portail Securise}"
 PROJECT_MONITORING="${PROJECT_MONITORING:-Monitoring}"
 PROJECT_NETWORK="${PROJECT_NETWORK:-Network Backup}"
+PROJECT_PROFESSEUR="${PROJECT_PROFESSEUR:-Le Professeur}"
 
 # Git
 GIT_URL="${GIT_REPO_URL:-https://github.com/timox/ansible-toolbox.git}"
@@ -698,6 +700,75 @@ setup_project_network() {
     log_ok "Projet '${project_name}' configure (${project_id})"
 }
 
+# --- Projet Le Professeur ----------------------------------------------------
+setup_project_professeur() {
+    local project_name="$PROJECT_PROFESSEUR"
+    log_section "Projet : ${project_name}"
+
+    local project_id
+    project_id=$(create_project "$project_name")
+
+    # Keys
+    log_info "Configuration des keys..."
+    local key_git key_ssh key_vault
+    key_git=$(create_key_none "$project_id" "git-toolbox")
+
+    if [ -n "${SSH_PRIVATE_KEY:-}" ]; then
+        key_ssh=$(create_key_ssh "$project_id" "ssh-servers" "${SSH_USER:-ubuntu}" "$SSH_PRIVATE_KEY")
+    else
+        key_ssh=$(create_key_none "$project_id" "ssh-servers")
+        log_warn "  SSH_PRIVATE_KEY non defini, key creee sans cle (a configurer dans l'UI)"
+    fi
+
+    if [ -n "${VAULT_PASSWORD:-}" ]; then
+        key_vault=$(create_key_login_password "$project_id" "vault-password" "" "$VAULT_PASSWORD")
+    else
+        key_vault=$(create_key_login_password "$project_id" "vault-password" "" "changeme")
+        log_warn "  VAULT_PASSWORD non defini dans .env, utiliser 'changeme' par defaut"
+    fi
+
+    # Repository
+    log_info "Configuration du repository..."
+    local repo_id
+    repo_id=$(create_repository "$project_id" "ansible-toolbox" "$GIT_URL" "$GIT_BRANCH" "$key_git")
+
+    # Inventaire
+    log_info "Configuration de l'inventaire..."
+    local inv_id
+    inv_id=$(create_inventory "$project_id" "professeur-servers" "$INVENTORY_PATH" "$key_ssh" "$repo_id")
+
+    # Environnement
+    log_info "Configuration de l'environnement..."
+    local env_id
+    env_id=$(create_environment "$project_id" "production")
+
+    # Templates
+    log_info "Creation des templates..."
+
+    create_template "$project_id" \
+        "Professeur - Bootstrap Server" \
+        "${PLAYBOOK_DIR}/professeur.yml" \
+        "$inv_id" "$repo_id" "$env_id" \
+        "[\"--tags\", \"bootstrap,docker,professeur\"]" "" "$key_vault" \
+        "Premiere installation : bootstrap serveur + Docker + deploiement app"
+
+    create_template "$project_id" \
+        "Professeur - Deploy" \
+        "${PLAYBOOK_DIR}/professeur.yml" \
+        "$inv_id" "$repo_id" "$env_id" \
+        "" "" "$key_vault" \
+        "Deploiement/mise a jour de Le Professeur"
+
+    create_template "$project_id" \
+        "Professeur - Dry Run" \
+        "${PLAYBOOK_DIR}/professeur.yml" \
+        "$inv_id" "$repo_id" "$env_id" \
+        "[\"--check\", \"--diff\"]" "" "$key_vault" \
+        "Verification sans modification (dry run)"
+
+    log_ok "Projet '${project_name}' configure (${project_id})"
+}
+
 # ==============================================================================
 # Resume
 # ==============================================================================
@@ -722,6 +793,10 @@ print_summary() {
     echo -e "  ${GREEN}4.${NC} ${PROJECT_NETWORK}" >&2
     echo -e "     Templates : Backup - Network configs, Backup - Network configs (no push)" >&2
     echo -e "     Keys      : git-toolbox, cisco-credentials" >&2
+    echo "" >&2
+    echo -e "  ${GREEN}5.${NC} ${PROJECT_PROFESSEUR}" >&2
+    echo -e "     Templates : Professeur - Bootstrap Server, Professeur - Deploy, Professeur - Dry Run" >&2
+    echo -e "     Keys      : git-toolbox, ssh-servers, vault-password" >&2
     echo "" >&2
 
     echo -e "Acces Semaphore : ${BLUE}${SEMAPHORE_URL}${NC}" >&2
@@ -764,9 +839,10 @@ main() {
     # Authentification
     authenticate
 
-    # Creer les 4 projets
+    # Creer les 5 projets
     setup_project_infra
     setup_project_portal
+    setup_project_professeur
     setup_project_monitoring
     setup_project_network
 
