@@ -27,7 +27,6 @@
       owner: "1000"
     - path: /data/professeur/keycloak-db
       owner: "70"
-    - path: /data/professeur/keycloak
     - path: "{{ prod_dir }}/professeur/nginx"
     - path: "{{ prod_dir }}/professeur/realm-import"
   when: professeur_state == 'present'
@@ -108,22 +107,40 @@
   changed_when: false
   ignore_errors: true
 
+- name: Wait for Keycloak to be healthy
+  ansible.builtin.uri:
+    url: "http://localhost:{{ professeur_port }}/auth/health/ready"
+    status_code: 200
+  register: keycloak_health
+  until: keycloak_health.status == 200
+  retries: 18
+  delay: 10
+  when: professeur_state == 'present'
+  changed_when: false
+  ignore_errors: true
+
 - name: Show container logs on health check failure
   ansible.builtin.command:
-    cmd: docker logs --tail 50 professeur-rdr
-  register: rdr_logs
-  when: professeur_health is failed
+    cmd: "docker logs --tail 50 {{ item }}"
+  loop:
+    - professeur-rdr
+    - professeur-keycloak
+  register: container_logs
+  when: professeur_health is failed or keycloak_health is failed
   changed_when: false
 
-- name: Display rdr-observation logs
+- name: Display container logs
   ansible.builtin.debug:
-    var: rdr_logs.stdout_lines
-  when: rdr_logs is defined and rdr_logs is not skipped
+    msg: "{{ item.stdout_lines }}"
+  loop: "{{ container_logs.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item | default('unknown') }}"
+  when: container_logs is defined and container_logs is not skipped
 
 - name: Fail if health check failed
   ansible.builtin.fail:
-    msg: "Le Professeur health check failed. See container logs above."
-  when: professeur_health is failed
+    msg: "Health check failed. See container logs above."
+  when: professeur_health is failed or keycloak_health is failed
 
 - name: Display Le Professeur deployment status
   ansible.builtin.debug:

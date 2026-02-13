@@ -16,8 +16,10 @@ services:
       - /data/professeur/certbot-webroot:/var/www/certbot:ro
 {% endif %}
     depends_on:
-      - rdr-observation
-      - keycloak
+      rdr-observation:
+        condition: service_started
+      keycloak:
+        condition: service_healthy
     networks:
       - professeur-net
     restart: unless-stopped
@@ -76,6 +78,7 @@ services:
       - KC_HTTP_RELATIVE_PATH=/auth
       - KC_PROXY_HEADERS=xforwarded
       - KC_HTTP_ENABLED=true
+      - KC_HEALTH_ENABLED=true
 {% if professeur_tls_enabled | default(false) %}
       - KC_HOSTNAME=https://{{ professeur_domain }}
 {% else %}
@@ -87,7 +90,6 @@ services:
     command: start-dev --import-realm
 {% endif %}
     volumes:
-      - /data/professeur/keycloak:/opt/keycloak/data
       - ./realm-import:/opt/keycloak/data/import:ro
     depends_on:
       keycloak-db:
@@ -95,6 +97,12 @@ services:
     networks:
       - professeur-net
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
 
 {% if professeur_tls_enabled | default(false) %}
   certbot:
