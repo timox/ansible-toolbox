@@ -15,7 +15,7 @@ professeur_port: 8085
 professeur_domain: "professeur.{{ domain }}"
 
 # TLS / Let's Encrypt
-professeur_tls_enabled: false
+professeur_tls_enabled: true
 professeur_letsencrypt_email: "foucartt@timox.org"
 
 # BASE DE DONNEES (psychotopia-webapp, inactive pour le moment)
