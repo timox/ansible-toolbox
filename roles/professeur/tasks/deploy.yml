@@ -55,7 +55,7 @@
 
 - name: Wait for Le Professeur to be healthy
   ansible.builtin.uri:
-    url: "http://localhost:{{ professeur_port }}/obs/"
+    url: "http://localhost:{{ professeur_port }}/"
     status_code: 200
   register: professeur_health
   until: professeur_health.status == 200

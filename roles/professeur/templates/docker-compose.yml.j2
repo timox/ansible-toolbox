@@ -8,7 +8,6 @@ services:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - rdr-observation
-      - psychotopia-webapp
     networks:
       - professeur-net
     restart: unless-stopped
@@ -34,40 +33,41 @@ services:
       retries: 3
       start_period: 10s
 
-  psychotopia-webapp:
-    build:
-      context: ./src/psychotropia/psychotopia-webapp
-      dockerfile: Dockerfile
-    container_name: professeur-webapp
-    environment:
-      - APP_ENV=prod
-      - DATABASE_URL=mysql://{{ professeur_db_user }}:{{ professeur_db_password }}@mariadb:3306/{{ professeur_db_name }}?serverVersion=11.0
-    depends_on:
-      mariadb:
-        condition: service_healthy
-    networks:
-      - professeur-net
-    restart: unless-stopped
-
-  mariadb:
-    image: mariadb:11
-    container_name: professeur-mariadb
-    environment:
-      - MYSQL_ROOT_PASSWORD={{ professeur_db_root_password }}
-      - MYSQL_DATABASE={{ professeur_db_name }}
-      - MYSQL_USER={{ professeur_db_user }}
-      - MYSQL_PASSWORD={{ professeur_db_password }}
-    volumes:
-      - /data/professeur/mariadb:/var/lib/mysql
-    networks:
-      - professeur-net
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+  # psychotopia-webapp et mariadb seront actives plus tard
+  # psychotopia-webapp:
+  #   build:
+  #     context: ./src/psychotropia/psychotopia-webapp
+  #     dockerfile: Dockerfile
+  #   container_name: professeur-webapp
+  #   environment:
+  #     - APP_ENV=prod
+  #     - DATABASE_URL=mysql://{{ professeur_db_user }}:{{ professeur_db_password }}@mariadb:3306/{{ professeur_db_name }}?serverVersion=11.0
+  #   depends_on:
+  #     mariadb:
+  #       condition: service_healthy
+  #   networks:
+  #     - professeur-net
+  #   restart: unless-stopped
+  #
+  # mariadb:
+  #   image: mariadb:11
+  #   container_name: professeur-mariadb
+  #   environment:
+  #     - MYSQL_ROOT_PASSWORD={{ professeur_db_root_password }}
+  #     - MYSQL_DATABASE={{ professeur_db_name }}
+  #     - MYSQL_USER={{ professeur_db_user }}
+  #     - MYSQL_PASSWORD={{ professeur_db_password }}
+  #   volumes:
+  #     - /data/professeur/mariadb:/var/lib/mysql
+  #   networks:
+  #     - professeur-net
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #     start_period: 30s
 
 networks:
   professeur-net:
