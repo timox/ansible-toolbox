@@ -5,12 +5,15 @@
 #
 # Projet independant de reduction des risques.
 # Deploie l'application le-professeur (observations, tests psychotechniques,
-# referentiel substances) en tant que stack Docker.
+# referentiel substances) en tant que stack Docker sur un serveur dedie.
 #
 # Usage:
 #   ansible-playbook playbooks/professeur.yml
 #   ansible-playbook playbooks/professeur.yml --check --diff
 #   ansible-playbook playbooks/professeur.yml --tags professeur
+#
+# Premiere installation (serveur vierge) :
+#   ansible-playbook playbooks/professeur.yml --tags bootstrap,docker,professeur
 #
 # =============================================================================
 
@@ -19,11 +22,16 @@
   become: true
 
   roles:
-    - role: common
-      tags: [common, always]
+    # Phase 1 : Preparation du serveur (premiere installation)
+    - role: bootstrap
+      tags: [bootstrap, never]
 
+    - role: docker_setup
+      tags: [docker, never]
+
+    # Phase 2 : Deploiement applicatif
     - role: professeur
-      tags: [professeur]
+      tags: [professeur, always]
 
   post_tasks:
     - name: List running professeur containers

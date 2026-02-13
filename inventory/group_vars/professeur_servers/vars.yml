@@ -2,6 +2,12 @@
 # =============================================================================
 # LE PROFESSEUR - Variables publiques
 # =============================================================================
+# Serveur independant du portail securise
+
+# CONFIGURATION GLOBALE
+domain: timox.org
+prod_dir: "{{ playbook_dir }}/../environments/prod"
+tz: Europe/Paris
 
 # DEPLOIEMENT
 deploy_professeur: true
