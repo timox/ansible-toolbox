@@ -51,6 +51,7 @@
       - "{{ prod_dir }}/professeur/.env"
     state: "{{ professeur_state }}"
     build: always
+    remove_orphans: true
   register: professeur_deploy
 
 - name: Wait for Le Professeur to be healthy
