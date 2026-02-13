@@ -25,7 +25,28 @@
       owner: "999"
     - path: /data/professeur/sqlite
       owner: "1000"
+    - path: /data/professeur/keycloak-db
+      owner: "70"
+    - path: /data/professeur/keycloak
     - path: "{{ prod_dir }}/professeur/nginx"
+    - path: "{{ prod_dir }}/professeur/realm-import"
+  when: professeur_state == 'present'
+
+- name: Ensure Let's Encrypt directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - /data/professeur/letsencrypt
+    - /data/professeur/certbot-webroot
+  when: professeur_state == 'present' and (professeur_tls_enabled | default(false))
+
+- name: Copy Keycloak realm import
+  ansible.builtin.copy:
+    src: professeur-realm.json
+    dest: "{{ prod_dir }}/professeur/realm-import/professeur-realm.json"
+    mode: '0644'
   when: professeur_state == 'present'
 
 - name: Generate Professeur configs
@@ -42,6 +63,18 @@
     - src: nginx.conf.j2
       dest: "{{ prod_dir }}/professeur/nginx/default.conf"
   when: professeur_state == 'present'
+
+- name: Obtain Let's Encrypt certificate
+  ansible.builtin.command:
+    cmd: >
+      docker run --rm -p 80:80
+      -v /data/professeur/letsencrypt:/etc/letsencrypt
+      certbot/certbot certonly --standalone
+      -d {{ professeur_domain }}
+      --email {{ professeur_letsencrypt_email }}
+      --agree-tos --non-interactive
+    creates: "/data/professeur/letsencrypt/live/{{ professeur_domain }}/fullchain.pem"
+  when: professeur_state == 'present' and (professeur_tls_enabled | default(false))
 
 - name: Stop existing containers
   community.docker.docker_compose_v2:

@@ -14,15 +14,19 @@ deploy_professeur: true
 professeur_port: 8085
 professeur_domain: "professeur.{{ domain }}"
 
-# BASE DE DONNEES
+# TLS / Let's Encrypt
+professeur_tls_enabled: false
+professeur_letsencrypt_email: "foucartt@timox.org"
+
+# BASE DE DONNEES (psychotopia-webapp, inactive pour le moment)
 professeur_db_name: professeur
 professeur_db_user: professeur
 professeur_db_password: "tzFsNGv7CoQVv/wGlUHleNRCAlD7Im9Y"
 professeur_db_root_password: "y8TlUBuM4jxW+v3bh7Pgu2dz+98NZQHl"
 
-# GITHUB (token injecte via Semaphore environment)
-# professeur_github_token: set in Semaphore env
-
 # KEYCLOAK
-professeur_keycloak_client_id: professeur
-professeur_keycloak_client_secret: "TODO"
+professeur_keycloak_admin: admin
+professeur_keycloak_admin_password: "Kc-Pr0f-2026!xQ7m"
+professeur_keycloak_db_password: "kcDbP4ss-pRof2026wZ"
+professeur_keycloak_realm: professeur
+professeur_keycloak_client_id: professeur-app
