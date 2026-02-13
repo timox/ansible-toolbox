@@ -104,10 +104,6 @@
       when: deploy_bookstack | bool
       tags: [bookstack, optional]
 
-    - role: professeur
-      when: deploy_professeur | bool
-      tags: [professeur, optional]
-
   # ===========================================================================
   # Post-deploiement : verification sante
   # ===========================================================================

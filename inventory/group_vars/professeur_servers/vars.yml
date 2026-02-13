@@ -1,0 +1,19 @@
+---
+# =============================================================================
+# LE PROFESSEUR - Variables publiques
+# =============================================================================
+
+# DEPLOIEMENT
+deploy_professeur: true
+professeur_port: 8085
+professeur_domain: "professeur.{{ domain }}"
+
+# BASE DE DONNEES
+professeur_db_name: professeur
+professeur_db_user: professeur
+professeur_db_password: "{{ vault_professeur_db_password | default('changeme') }}"
+professeur_db_root_password: "{{ vault_professeur_db_root_password | default('changeme') }}"
+
+# KEYCLOAK
+professeur_keycloak_client_id: professeur
+professeur_keycloak_client_secret: "{{ vault_professeur_keycloak_secret | default('changeme') }}"

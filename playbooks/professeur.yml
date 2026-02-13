@@ -1,0 +1,39 @@
+---
+# =============================================================================
+# PROFESSEUR.YML - Deploiement de Le Professeur
+# =============================================================================
+#
+# Projet independant de reduction des risques.
+# Deploie l'application le-professeur (observations, tests psychotechniques,
+# referentiel substances) en tant que stack Docker.
+#
+# Usage:
+#   ansible-playbook playbooks/professeur.yml
+#   ansible-playbook playbooks/professeur.yml --check --diff
+#   ansible-playbook playbooks/professeur.yml --tags professeur
+#
+# =============================================================================
+
+- name: Deploy Le Professeur
+  hosts: professeur_servers
+  become: true
+
+  roles:
+    - role: common
+      tags: [common, always]
+
+    - role: professeur
+      tags: [professeur]
+
+  post_tasks:
+    - name: List running professeur containers
+      ansible.builtin.command:
+        cmd: docker ps --filter name=professeur --format "table {{'{{'}}.Names{{'}}'}}\t{{'{{'}}.Status{{'}}'}}"
+      register: docker_ps
+      changed_when: false
+      tags: [always, health]
+
+    - name: Display professeur services
+      ansible.builtin.debug:
+        msg: "{{ docker_ps.stdout_lines }}"
+      tags: [always, health]

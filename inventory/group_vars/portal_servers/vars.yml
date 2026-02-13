@@ -153,14 +153,3 @@ keycloak_proxy_hostname: ""
 
 # DOCKER
 compose_parallel_limit: 4
-
-# LE PROFESSEUR
-deploy_professeur: true
-professeur_port: 8085
-professeur_domain: "professeur.{{ domain }}"
-professeur_db_name: professeur
-professeur_db_user: professeur
-professeur_db_password: "{{ vault_professeur_db_password | default('changeme') }}"
-professeur_db_root_password: "{{ vault_professeur_db_root_password | default('changeme') }}"
-professeur_keycloak_client_id: professeur
-professeur_keycloak_client_secret: "{{ vault_professeur_keycloak_secret | default('changeme') }}"
