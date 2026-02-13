@@ -43,6 +43,14 @@
       dest: "{{ prod_dir }}/professeur/nginx/default.conf"
   when: professeur_state == 'present'
 
+- name: Stop existing containers
+  community.docker.docker_compose_v2:
+    project_src: "{{ prod_dir }}/professeur"
+    project_name: "{{ professeur_project_name }}"
+    state: absent
+    remove_orphans: true
+  when: professeur_state == 'present'
+
 - name: Deploy Le Professeur via Docker Compose
   community.docker.docker_compose_v2:
     project_src: "{{ prod_dir }}/professeur"
@@ -51,6 +59,7 @@
       - "{{ prod_dir }}/professeur/.env"
     state: "{{ professeur_state }}"
     build: always
+    recreate: always
     remove_orphans: true
   register: professeur_deploy
 
@@ -64,6 +73,24 @@
   delay: 10
   when: professeur_state == 'present'
   changed_when: false
+  ignore_errors: true
+
+- name: Show container logs on health check failure
+  ansible.builtin.command:
+    cmd: docker logs --tail 50 professeur-rdr
+  register: rdr_logs
+  when: professeur_health is failed
+  changed_when: false
+
+- name: Display rdr-observation logs
+  ansible.builtin.debug:
+    var: rdr_logs.stdout_lines
+  when: rdr_logs is defined and rdr_logs is not skipped
+
+- name: Fail if health check failed
+  ansible.builtin.fail:
+    msg: "Le Professeur health check failed. See container logs above."
+  when: professeur_health is failed
 
 - name: Display Le Professeur deployment status
   ansible.builtin.debug:
