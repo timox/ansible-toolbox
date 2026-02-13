@@ -1,12 +1,12 @@
 ---
 # =============================================================================
-# LE PROFESSEUR - Variables publiques
+# LE PROFESSEUR - Variables
 # =============================================================================
 # Serveur independant du portail securise
 
 # CONFIGURATION GLOBALE
 domain: timox.org
-prod_dir: "{{ playbook_dir }}/../environments/prod"
+prod_dir: /opt/professeur
 tz: Europe/Paris
 
 # DEPLOIEMENT
@@ -17,9 +17,12 @@ professeur_domain: "professeur.{{ domain }}"
 # BASE DE DONNEES
 professeur_db_name: professeur
 professeur_db_user: professeur
-professeur_db_password: "{{ vault_professeur_db_password | default('changeme') }}"
-professeur_db_root_password: "{{ vault_professeur_db_root_password | default('changeme') }}"
+professeur_db_password: "tzFsNGv7CoQVv/wGlUHleNRCAlD7Im9Y"
+professeur_db_root_password: "y8TlUBuM4jxW+v3bh7Pgu2dz+98NZQHl"
+
+# GITHUB (token injecte via Semaphore environment)
+# professeur_github_token: set in Semaphore env
 
 # KEYCLOAK
 professeur_keycloak_client_id: professeur
-professeur_keycloak_client_secret: "{{ vault_professeur_keycloak_secret | default('changeme') }}"
+professeur_keycloak_client_secret: "TODO"

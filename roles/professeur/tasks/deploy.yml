@@ -7,11 +7,12 @@
 
 - name: Clone le-professeur repository
   ansible.builtin.git:
-    repo: "https://github.com/timox/le-professeur.git"
+    repo: "https://{{ professeur_github_token }}@github.com/timox/le-professeur.git"
     dest: "{{ prod_dir }}/professeur/src"
     version: main
     force: true
   when: professeur_state == 'present'
+  no_log: true
 
 - name: Ensure directories exist
   ansible.builtin.file:
