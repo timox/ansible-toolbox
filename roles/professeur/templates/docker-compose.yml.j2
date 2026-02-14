@@ -84,11 +84,7 @@ services:
 {% else %}
       - KC_HOSTNAME_STRICT=false
 {% endif %}
-{% if professeur_tls_enabled | default(false) %}
-    command: start --import-realm
-{% else %}
     command: start-dev --import-realm
-{% endif %}
     volumes:
       - ./realm-import:/opt/keycloak/data/import:ro
     depends_on:
