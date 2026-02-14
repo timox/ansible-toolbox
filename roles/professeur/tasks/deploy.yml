@@ -95,12 +95,18 @@
     remove_orphans: true
   register: professeur_deploy
 
+- name: Set health check base URL
+  ansible.builtin.set_fact:
+    _professeur_health_url: >-
+      {{ 'https://localhost' if (professeur_tls_enabled | default(false)) else 'http://localhost:' ~ professeur_port }}
+
 - name: Wait for Le Professeur to be healthy
   ansible.builtin.uri:
-    url: "http://localhost:{{ professeur_port }}/"
-    status_code: 200
+    url: "{{ _professeur_health_url }}/"
+    status_code: [200, 301]
+    validate_certs: false
   register: professeur_health
-  until: professeur_health.status == 200
+  until: professeur_health.status in [200, 301]
   retries: 30
   delay: 10
   when: professeur_state == 'present'
@@ -109,8 +115,9 @@
 
 - name: Wait for Keycloak to be healthy
   ansible.builtin.uri:
-    url: "http://localhost:{{ professeur_port }}/auth/health/ready"
+    url: "{{ _professeur_health_url }}/auth/health/ready"
     status_code: 200
+    validate_certs: false
   register: keycloak_health
   until: keycloak_health.status == 200
   retries: 18
