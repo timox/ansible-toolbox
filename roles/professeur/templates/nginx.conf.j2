@@ -41,9 +41,9 @@ server {
         proxy_busy_buffers_size 256k;
     }
 
-    # Keycloak resources fallback (theme CSS/JS/images)
+    # Keycloak theme resources (served at /auth/resources/ internally)
     location /resources/ {
-        proxy_pass http://keycloak:8080/resources/;
+        proxy_pass http://keycloak:8080/auth/resources/;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
