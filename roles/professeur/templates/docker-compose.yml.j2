@@ -79,6 +79,7 @@ services:
       - KC_PROXY_HEADERS=xforwarded
       - KC_HTTP_ENABLED=true
       - KC_HEALTH_ENABLED=true
+      - KC_LEGACY_OBSERVABILITY_INTERFACE=true
 {% if professeur_tls_enabled | default(false) %}
       - KC_HOSTNAME=https://{{ professeur_domain }}
 {% else %}
