@@ -1,0 +1,34 @@
+---
+# =============================================================================
+# luks — Setup (first-time only)
+# =============================================================================
+
+- name: Validate required variables
+  ansible.builtin.assert:
+    that:
+      - luks_device | length > 0
+      - luks_name | length > 0
+      - luks_mount | length > 0
+      - luks_passphrase | length > 0
+    fail_msg: "luks_device, luks_name, luks_mount, luks_passphrase are required"
+
+- name: Check if device is already LUKS
+  ansible.builtin.command: "cryptsetup isLuks {{ luks_device }}"
+  register: _luks_check
+  changed_when: false
+  failed_when: false
+
+- name: Format device with LUKS2
+  ansible.builtin.command: >
+    cryptsetup luksFormat
+    --type luks2
+    --cipher {{ luks_cipher }}
+    --key-size {{ luks_key_size }}
+    --hash {{ luks_hash }}
+    --pbkdf argon2id
+    --batch-mode
+    {{ luks_device }}
+  args:
+    stdin: "{{ luks_passphrase }}"
+  when: _luks_check.rc != 0
+  no_log: true

@@ -1,0 +1,16 @@
+---
+# =============================================================================
+# luks — Main Entry Point
+# =============================================================================
+
+- name: Install cryptsetup
+  ansible.builtin.include_tasks: install.yml
+  tags: [luks, install]
+
+- name: Setup LUKS volume (if new)
+  ansible.builtin.include_tasks: setup.yml
+  tags: [luks, setup]
+
+- name: Open and mount LUKS volume
+  ansible.builtin.include_tasks: open.yml
+  tags: [luks, open]

@@ -1,0 +1,11 @@
+---
+# =============================================================================
+# luks — Install
+# =============================================================================
+
+- name: Install cryptsetup
+  ansible.builtin.apt:
+    name: cryptsetup
+    state: present
+    update_cache: true
+    cache_valid_time: 3600

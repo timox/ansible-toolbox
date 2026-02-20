@@ -1,0 +1,51 @@
+---
+# =============================================================================
+# luks — Open and mount
+# =============================================================================
+
+- name: Check if LUKS device is already open
+  ansible.builtin.stat:
+    path: "/dev/mapper/{{ luks_name }}"
+  register: _luks_mapper
+
+- name: Open LUKS volume
+  ansible.builtin.command: "cryptsetup luksOpen {{ luks_device }} {{ luks_name }}"
+  args:
+    stdin: "{{ luks_passphrase }}"
+  when: not _luks_mapper.stat.exists
+  no_log: true
+
+- name: Check if filesystem exists
+  ansible.builtin.command: "blkid /dev/mapper/{{ luks_name }}"
+  register: _luks_blkid
+  changed_when: false
+  failed_when: false
+
+- name: Create ext4 filesystem
+  ansible.builtin.command: "mkfs.ext4 /dev/mapper/{{ luks_name }}"
+  when: _luks_blkid.rc != 0
+
+- name: Create mount point
+  ansible.builtin.file:
+    path: "{{ luks_mount }}"
+    state: directory
+    mode: "0700"
+
+- name: Mount LUKS volume
+  ansible.posix.mount:
+    path: "{{ luks_mount }}"
+    src: "/dev/mapper/{{ luks_name }}"
+    fstype: ext4
+    state: mounted
+
+- name: Create subdirectories
+  ansible.builtin.file:
+    path: "{{ luks_mount }}/{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.group | default('root') }}"
+    mode: "{{ item.mode | default('0700') }}"
+  loop: "{{ luks_directories }}"
+  loop_control:
+    label: "{{ item.path }}"
+  when: luks_directories | length > 0

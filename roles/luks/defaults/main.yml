@@ -1,0 +1,13 @@
+---
+# =============================================================================
+# luks role defaults
+# =============================================================================
+
+luks_device: ""
+luks_name: ""
+luks_mount: ""
+luks_passphrase: ""
+luks_cipher: aes-xts-plain64
+luks_key_size: 512
+luks_hash: sha512
+luks_directories: []
