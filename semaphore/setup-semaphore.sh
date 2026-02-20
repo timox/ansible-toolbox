@@ -2,12 +2,14 @@
 # ==============================================================================
 # setup-semaphore.sh - Provision des projets Semaphore via API
 #
-# Cree 5 projets avec keys, repository, inventaire, environnement et templates :
+# Cree 7 projets avec keys, repository, inventaire, environnement et templates :
 #   - Infrastructure       : bootstrap, check serveurs
 #   - Portail Securise     : deploy/destroy stack portail
 #   - Le Professeur        : deploy app reduction des risques
 #   - Monitoring           : Zabbix agent
 #   - Network Backup       : sauvegarde configs Cisco
+#   - anonXchange          : deploiement 2-VPS Tor (bounce + app)
+#   - KVM Test VMs         : provisioning/destruction VMs de test
 #
 # Usage : ./semaphore/setup-semaphore.sh
 # ==============================================================================
@@ -44,6 +46,8 @@ PROJECT_PORTAL="${PROJECT_PORTAL:-Portail Securise}"
 PROJECT_MONITORING="${PROJECT_MONITORING:-Monitoring}"
 PROJECT_NETWORK="${PROJECT_NETWORK:-Network Backup}"
 PROJECT_PROFESSEUR="${PROJECT_PROFESSEUR:-Le Professeur}"
+PROJECT_ANONXCHANGE="${PROJECT_ANONXCHANGE:-anonXchange}"
+PROJECT_KVM="${PROJECT_KVM:-KVM Test VMs}"
 
 # Git
 GIT_URL="${GIT_REPO_URL:-https://github.com/timox/ansible-toolbox.git}"
@@ -769,6 +773,158 @@ setup_project_professeur() {
     log_ok "Projet '${project_name}' configure (${project_id})"
 }
 
+# --- Projet anonXchange -------------------------------------------------------
+setup_project_anonxchange() {
+    local project_name="$PROJECT_ANONXCHANGE"
+    log_section "Projet : ${project_name}"
+
+    local project_id
+    project_id=$(create_project "$project_name")
+
+    # Keys
+    log_info "Configuration des keys..."
+    local key_git key_ssh key_vault
+    key_git=$(create_key_none "$project_id" "git-toolbox")
+
+    if [ -n "${SSH_PRIVATE_KEY:-}" ]; then
+        key_ssh=$(create_key_ssh "$project_id" "ssh-servers" "${SSH_USER:-ubuntu}" "$SSH_PRIVATE_KEY")
+    else
+        key_ssh=$(create_key_none "$project_id" "ssh-servers")
+        log_warn "  SSH_PRIVATE_KEY non defini, key creee sans cle (a configurer dans l'UI)"
+    fi
+
+    if [ -n "${VAULT_PASSWORD:-}" ]; then
+        key_vault=$(create_key_login_password "$project_id" "vault-password" "" "$VAULT_PASSWORD")
+    else
+        key_vault=$(create_key_login_password "$project_id" "vault-password" "" "changeme")
+        log_warn "  VAULT_PASSWORD non defini dans .env, utiliser 'changeme' par defaut"
+    fi
+
+    # Repository
+    log_info "Configuration du repository..."
+    local repo_id
+    repo_id=$(create_repository "$project_id" "ansible-toolbox" "$GIT_URL" "$GIT_BRANCH" "$key_git")
+
+    # Inventaire
+    log_info "Configuration de l'inventaire..."
+    local inv_id
+    inv_id=$(create_inventory "$project_id" "anonxchange-servers" "$INVENTORY_PATH" "$key_ssh" "$repo_id")
+
+    # Environnement
+    log_info "Configuration de l'environnement..."
+    local env_id
+    env_id=$(create_environment "$project_id" "production")
+
+    # Templates
+    log_info "Creation des templates..."
+
+    create_template "$project_id" \
+        "Bounce - Deploy Full" \
+        "${PLAYBOOK_DIR}/anonxchange-bounce.yml" \
+        "$inv_id" "$repo_id" "$env_id" \
+        "" "" "$key_vault" \
+        "Deploiement complet du serveur rebond Tor (Tor HS + nginx + cover traffic)"
+
+    create_template "$project_id" \
+        "App - Deploy Full" \
+        "${PLAYBOOK_DIR}/anonxchange-app.yml" \
+        "$inv_id" "$repo_id" "$env_id" \
+        "" "" "$key_vault" \
+        "Deploiement complet du serveur applicatif (Docker stack isolee)"
+
+    create_template "$project_id" \
+        "App - Update Code" \
+        "${PLAYBOOK_DIR}/anonxchange-app.yml" \
+        "$inv_id" "$repo_id" "$env_id" \
+        "[\"--tags\", \"deploy\"]" "" "$key_vault" \
+        "Mise a jour du code applicatif uniquement (rsync + rebuild)"
+
+    create_template "$project_id" \
+        "Bounce - Update Config" \
+        "${PLAYBOOK_DIR}/anonxchange-bounce.yml" \
+        "$inv_id" "$repo_id" "$env_id" \
+        "[\"--tags\", \"deploy\"]" "" "$key_vault" \
+        "Mise a jour de la configuration rebond (nginx, torrc, cover traffic)"
+
+    create_template "$project_id" \
+        "Healthcheck" \
+        "${PLAYBOOK_DIR}/anonxchange-check.yml" \
+        "$inv_id" "$repo_id" "$env_id" \
+        "" "" "$key_vault" \
+        "Verification de sante des 2 VPS (services, Tor, connectivite)"
+
+    create_template "$project_id" \
+        "App - Backup Now" \
+        "${PLAYBOOK_DIR}/anonxchange-app.yml" \
+        "$inv_id" "$repo_id" "$env_id" \
+        "[\"--tags\", \"backup\"]" "" "$key_vault" \
+        "Sauvegarde manuelle de la base de donnees (pg_dump + GPG)"
+
+    log_ok "Projet '${project_name}' configure (${project_id})"
+}
+
+# --- Projet KVM Test VMs -----------------------------------------------------
+setup_project_kvm() {
+    local project_name="$PROJECT_KVM"
+    log_section "Projet : ${project_name}"
+
+    local project_id
+    project_id=$(create_project "$project_name")
+
+    # Keys
+    log_info "Configuration des keys..."
+    local key_git key_ssh key_vault
+    key_git=$(create_key_none "$project_id" "git-toolbox")
+
+    if [ -n "${SSH_PRIVATE_KEY:-}" ]; then
+        key_ssh=$(create_key_ssh "$project_id" "ssh-kvm" "${SSH_USER:-root}" "$SSH_PRIVATE_KEY")
+    else
+        key_ssh=$(create_key_none "$project_id" "ssh-kvm")
+        log_warn "  SSH_PRIVATE_KEY non defini, key creee sans cle (a configurer dans l'UI)"
+    fi
+
+    if [ -n "${VAULT_PASSWORD:-}" ]; then
+        key_vault=$(create_key_login_password "$project_id" "vault-password" "" "$VAULT_PASSWORD")
+    else
+        key_vault=$(create_key_login_password "$project_id" "vault-password" "" "changeme")
+        log_warn "  VAULT_PASSWORD non defini dans .env, utiliser 'changeme' par defaut"
+    fi
+
+    # Repository
+    log_info "Configuration du repository..."
+    local repo_id
+    repo_id=$(create_repository "$project_id" "ansible-toolbox" "$GIT_URL" "$GIT_BRANCH" "$key_git")
+
+    # Inventaire
+    log_info "Configuration de l'inventaire..."
+    local inv_id
+    inv_id=$(create_inventory "$project_id" "kvm-hosts" "$INVENTORY_PATH" "$key_ssh" "$repo_id")
+
+    # Environnement
+    log_info "Configuration de l'environnement..."
+    local env_id
+    env_id=$(create_environment "$project_id" "lab")
+
+    # Templates
+    log_info "Creation des templates..."
+
+    create_template "$project_id" \
+        "Create anonXchange VMs" \
+        "${PLAYBOOK_DIR}/kvm-anonxchange.yml" \
+        "$inv_id" "$repo_id" "$env_id" \
+        "" "" "$key_vault" \
+        "Provisioning des VMs anonXchange (bounce + app) sur KVM"
+
+    create_template "$project_id" \
+        "Destroy anonXchange VMs" \
+        "${PLAYBOOK_DIR}/kvm-anonxchange.yml" \
+        "$inv_id" "$repo_id" "$env_id" \
+        "[\"--extra-vars\", \"kvm_state=absent\"]" "" "$key_vault" \
+        "Destruction des VMs anonXchange sur KVM"
+
+    log_ok "Projet '${project_name}' configure (${project_id})"
+}
+
 # ==============================================================================
 # Resume
 # ==============================================================================
@@ -797,6 +953,15 @@ print_summary() {
     echo -e "  ${GREEN}5.${NC} ${PROJECT_PROFESSEUR}" >&2
     echo -e "     Templates : Professeur - Bootstrap Server, Professeur - Deploy, Professeur - Dry Run" >&2
     echo -e "     Keys      : git-toolbox, ssh-servers, vault-password" >&2
+    echo "" >&2
+    echo -e "  ${GREEN}6.${NC} ${PROJECT_ANONXCHANGE}" >&2
+    echo -e "     Templates : Bounce - Deploy Full, App - Deploy Full, App - Update Code," >&2
+    echo -e "                 Bounce - Update Config, Healthcheck, App - Backup Now" >&2
+    echo -e "     Keys      : git-toolbox, ssh-servers, vault-password" >&2
+    echo "" >&2
+    echo -e "  ${GREEN}7.${NC} ${PROJECT_KVM}" >&2
+    echo -e "     Templates : Create anonXchange VMs, Destroy anonXchange VMs" >&2
+    echo -e "     Keys      : git-toolbox, ssh-kvm, vault-password" >&2
     echo "" >&2
 
     echo -e "Acces Semaphore : ${BLUE}${SEMAPHORE_URL}${NC}" >&2
@@ -839,12 +1004,14 @@ main() {
     # Authentification
     authenticate
 
-    # Creer les 5 projets
+    # Creer les 7 projets
     setup_project_infra
     setup_project_portal
     setup_project_professeur
     setup_project_monitoring
     setup_project_network
+    setup_project_anonxchange
+    setup_project_kvm
 
     # Resume
     print_summary
