@@ -1,0 +1,21 @@
+---
+# =============================================================================
+# wireguard — Main Entry Point
+# =============================================================================
+
+- name: Install WireGuard
+  ansible.builtin.include_tasks: install.yml
+  when: wg_state == 'present'
+  tags: [wireguard, install]
+
+- name: Configure WireGuard tunnel
+  ansible.builtin.include_tasks: configure.yml
+  when: wg_state == 'present'
+  tags: [wireguard, configure]
+
+- name: Verify WireGuard connectivity
+  ansible.builtin.include_tasks: verify.yml
+  when:
+    - wg_state == 'present'
+    - not ansible_check_mode
+  tags: [wireguard, verify]

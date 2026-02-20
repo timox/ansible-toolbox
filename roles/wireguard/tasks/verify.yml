@@ -1,0 +1,14 @@
+---
+# =============================================================================
+# wireguard — Verify connectivity
+# =============================================================================
+
+- name: Extract peer IP from allowed_ips
+  ansible.builtin.set_fact:
+    _wg_peer_ip: "{{ wg_peer_allowed_ips | regex_replace('/\\d+$', '') }}"
+
+- name: Ping WireGuard peer
+  ansible.builtin.command: "ping -c 2 -W 5 {{ _wg_peer_ip }}"
+  register: _wg_ping
+  changed_when: false
+  failed_when: _wg_ping.rc != 0

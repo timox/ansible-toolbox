@@ -1,0 +1,28 @@
+---
+# =============================================================================
+# wireguard — Configure
+# =============================================================================
+
+- name: Validate required variables
+  ansible.builtin.assert:
+    that:
+      - wg_address | length > 0
+      - wg_private_key | length > 0
+      - wg_peer_public_key | length > 0
+      - wg_peer_allowed_ips | length > 0
+    fail_msg: "wg_address, wg_private_key, wg_peer_public_key, wg_peer_allowed_ips are required"
+
+- name: Deploy WireGuard config
+  ansible.builtin.template:
+    src: wg0.conf.j2
+    dest: "/etc/wireguard/{{ wg_interface }}.conf"
+    owner: root
+    group: root
+    mode: "0600"
+  notify: restart wireguard
+
+- name: Enable and start WireGuard
+  ansible.builtin.systemd:
+    name: "wg-quick@{{ wg_interface }}"
+    state: started
+    enabled: "{{ wg_enabled | bool }}"

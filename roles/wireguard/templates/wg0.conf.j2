@@ -1,0 +1,25 @@
+# {{ ansible_managed }}
+# WireGuard tunnel configuration
+
+[Interface]
+Address = {{ wg_address }}
+PrivateKey = {{ wg_private_key }}
+{% if wg_listen_port %}
+ListenPort = {{ wg_listen_port }}
+{% endif %}
+{% if wg_post_up %}
+PostUp = {{ wg_post_up }}
+{% endif %}
+{% if wg_post_down %}
+PostDown = {{ wg_post_down }}
+{% endif %}
+
+[Peer]
+PublicKey = {{ wg_peer_public_key }}
+AllowedIPs = {{ wg_peer_allowed_ips }}
+{% if wg_peer_endpoint %}
+Endpoint = {{ wg_peer_endpoint }}
+{% endif %}
+{% if wg_persistent_keepalive %}
+PersistentKeepalive = {{ wg_persistent_keepalive }}
+{% endif %}
