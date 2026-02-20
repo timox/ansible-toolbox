@@ -1,0 +1,10 @@
+---
+# =============================================================================
+# anonxchange_backup role defaults
+# =============================================================================
+
+backup_gpg_recipient: ""
+backup_cron_schedule: "0 3 * * 0"
+backup_retention_days: 30
+backup_dir: /data/anonxchange/backups
+backup_compose_file: /data/anonxchange/src/infra/app/docker-compose.prod.yml

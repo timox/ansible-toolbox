@@ -1,0 +1,121 @@
+#!/bin/bash
+# {{ ansible_managed }}
+set -euo pipefail
+
+# =============================================================================
+# restore-db.sh — Restore PostgreSQL from GPG-encrypted backup
+# =============================================================================
+#
+# Decrypts a GPG-encrypted pg_dump file and restores it into the running
+# PostgreSQL container. WARNING: This replaces the current database contents.
+#
+# Usage:
+#   ./restore-db.sh <backup.dump.gpg> [compose-file]
+#
+# Arguments:
+#   backup.dump.gpg   Path to the GPG-encrypted backup file
+#   compose-file      Path to docker-compose file (default: {{ backup_compose_file }})
+#
+# Environment:
+#   POSTGRES_USER     Database user (default: anonxchange)
+#   POSTGRES_DB       Database name (default: anonxchange)
+#
+# Prerequisites:
+#   - GPG private key for decryption must be available in the local keyring
+#   - The db container must be running
+#   - The app container should be stopped to avoid conflicts during restore
+#
+# Example:
+#   ./restore-db.sh backups/anonxchange-20260219-120000.dump.gpg
+# =============================================================================
+
+# --- Argument validation ---
+
+if [ $# -lt 1 ]; then
+    echo "ERROR: Missing backup file path."
+    echo "Usage: $0 <backup.dump.gpg> [compose-file]"
+    exit 1
+fi
+
+BACKUP_FILE="$1"
+COMPOSE_FILE="${2:-{{ backup_compose_file }}}"
+
+# Verify backup file exists and is non-empty
+if [ ! -f "$BACKUP_FILE" ]; then
+    echo "ERROR: Backup file not found: $BACKUP_FILE"
+    exit 1
+fi
+
+if [ ! -s "$BACKUP_FILE" ]; then
+    echo "ERROR: Backup file is empty: $BACKUP_FILE"
+    exit 1
+fi
+
+# Verify compose file exists
+if [ ! -f "$COMPOSE_FILE" ]; then
+    echo "ERROR: Compose file not found: $COMPOSE_FILE"
+    exit 1
+fi
+
+# --- Configuration ---
+
+DB_USER="${POSTGRES_USER:-anonxchange}"
+DB_NAME="${POSTGRES_DB:-anonxchange}"
+BACKUP_SIZE="$(du -h "$BACKUP_FILE" | cut -f1)"
+
+# --- Safety confirmation ---
+
+echo "=== anonXchange Database Restore ==="
+echo ""
+echo "  Backup file: $BACKUP_FILE ($BACKUP_SIZE)"
+echo "  Compose file: $COMPOSE_FILE"
+echo "  Target DB:    $DB_NAME (user: $DB_USER)"
+echo ""
+echo "WARNING: This will REPLACE the current database."
+echo "All existing data will be overwritten."
+echo ""
+echo "It is recommended to stop the app container first:"
+echo "  docker compose -f $COMPOSE_FILE stop anonxchange"
+echo ""
+read -r -p "Type YES to proceed: " CONFIRM
+
+if [ "$CONFIRM" != "YES" ]; then
+    echo "Restore cancelled."
+    exit 0
+fi
+
+# --- Perform restore ---
+
+echo ""
+echo "Decrypting and restoring..."
+
+# Decrypt the GPG file and pipe directly to pg_restore.
+# --clean: drop existing objects before recreating
+# --if-exists: don't error if objects don't exist yet (clean restore)
+# Plaintext dump never touches disk.
+gpg --decrypt "$BACKUP_FILE" \
+    | docker compose -f "$COMPOSE_FILE" exec -T db \
+        pg_restore -U "$DB_USER" -d "$DB_NAME" --clean --if-exists
+
+RESTORE_STATUS=$?
+
+echo ""
+
+if [ $RESTORE_STATUS -eq 0 ]; then
+    echo "Restore completed successfully."
+    echo ""
+    echo "Next steps:"
+    echo "  1. Restart the app: docker compose -f $COMPOSE_FILE up -d anonxchange"
+    echo "  2. Verify the app is healthy: curl -sf http://localhost:3000/health"
+else
+    # pg_restore returns non-zero for warnings (e.g. "relation already exists").
+    # With --clean --if-exists, most warnings are harmless.
+    echo "Restore completed with warnings (exit code: $RESTORE_STATUS)."
+    echo "This is often normal — pg_restore reports warnings for pre-existing objects."
+    echo ""
+    echo "Check the database manually:"
+    echo "  docker compose -f $COMPOSE_FILE exec db psql -U $DB_USER -d $DB_NAME -c '\\dt'"
+fi
+
+echo ""
+echo "=== Restore finished ==="

@@ -1,0 +1,109 @@
+#!/bin/bash
+# {{ ansible_managed }}
+set -euo pipefail
+
+# =============================================================================
+# backup-db.sh — Automated PostgreSQL backup with GPG encryption
+# =============================================================================
+#
+# Creates a compressed (pg_dump -Fc) database dump, encrypts it with GPG,
+# and prunes backups older than {{ backup_retention_days }} days.
+#
+# Usage:
+#   ./backup-db.sh <GPG_RECIPIENT> [compose-file]
+#
+# Arguments:
+#   GPG_RECIPIENT   GPG key ID or email to encrypt for (e.g. admin@example.onion)
+#   compose-file    Path to docker-compose file (default: {{ backup_compose_file }})
+#
+# Environment:
+#   POSTGRES_USER   Database user (default: anonxchange)
+#   POSTGRES_DB     Database name (default: anonxchange)
+#
+# Example:
+#   ./backup-db.sh admin@anonxchange.onion
+#   ./backup-db.sh 0xABCD1234 ./docker-compose.yml
+#
+# Restore with:
+#   ./restore-db.sh backups/anonxchange-20260219-120000.dump.gpg
+# =============================================================================
+
+# --- Argument validation ---
+
+if [ $# -lt 1 ]; then
+    echo "ERROR: Missing GPG recipient."
+    echo "Usage: $0 <GPG_RECIPIENT> [compose-file]"
+    exit 1
+fi
+
+RECIPIENT="$1"
+COMPOSE_FILE="${2:-{{ backup_compose_file }}}"
+
+# Verify compose file exists
+if [ ! -f "$COMPOSE_FILE" ]; then
+    echo "ERROR: Compose file not found: $COMPOSE_FILE"
+    exit 1
+fi
+
+# Verify GPG recipient key is available
+if ! gpg --list-keys "$RECIPIENT" >/dev/null 2>&1; then
+    echo "ERROR: GPG key not found for recipient: $RECIPIENT"
+    echo "Import the key first: gpg --import <keyfile>"
+    exit 1
+fi
+
+# --- Configuration ---
+
+BACKUP_DIR="{{ backup_dir }}"
+TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
+BACKUP_FILE="$BACKUP_DIR/anonxchange-$TIMESTAMP.dump.gpg"
+DB_USER="${POSTGRES_USER:-anonxchange}"
+DB_NAME="${POSTGRES_DB:-anonxchange}"
+
+# Create backup directory if it does not exist
+mkdir -p "$BACKUP_DIR"
+
+# --- Perform backup ---
+
+echo "=== anonXchange Database Backup ==="
+echo "Timestamp:    $TIMESTAMP"
+echo "Recipient:    $RECIPIENT"
+echo "Compose file: $COMPOSE_FILE"
+echo "Output:       $BACKUP_FILE"
+echo ""
+
+echo "Dumping database and encrypting..."
+
+# pg_dump with custom format (-Fc) for efficient compression,
+# piped directly to GPG encryption — plaintext never touches disk.
+docker compose -f "$COMPOSE_FILE" exec -T db \
+    pg_dump -U "$DB_USER" -Fc "$DB_NAME" \
+    | gpg --encrypt --recipient "$RECIPIENT" --output "$BACKUP_FILE"
+
+# Verify the backup file was created and is non-empty
+if [ ! -s "$BACKUP_FILE" ]; then
+    echo "ERROR: Backup file is empty or was not created."
+    rm -f "$BACKUP_FILE"
+    exit 1
+fi
+
+# --- Report ---
+
+BACKUP_SIZE="$(du -h "$BACKUP_FILE" | cut -f1)"
+echo ""
+echo "Backup complete:"
+echo "  File: $BACKUP_FILE"
+echo "  Size: $BACKUP_SIZE"
+
+# --- Prune old backups (older than {{ backup_retention_days }} days) ---
+
+echo ""
+echo "Pruning backups older than {{ backup_retention_days }} days..."
+PRUNED=$(find "$BACKUP_DIR" -name "*.dump.gpg" -mtime +{{ backup_retention_days }} -print -delete | wc -l)
+echo "  Pruned: $PRUNED file(s)"
+
+REMAINING=$(find "$BACKUP_DIR" -name "*.dump.gpg" | wc -l)
+echo "  Remaining: $REMAINING backup(s)"
+
+echo ""
+echo "=== Backup finished ==="

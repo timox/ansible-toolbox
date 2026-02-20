@@ -1,0 +1,46 @@
+---
+# =============================================================================
+# anonxchange_backup — Main Entry Point
+# =============================================================================
+
+- name: Install GPG
+  ansible.builtin.apt:
+    name: gnupg
+    state: present
+  tags: [backup, install]
+
+- name: Create backup directory
+  ansible.builtin.file:
+    path: "{{ backup_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  tags: [backup]
+
+- name: Deploy backup script
+  ansible.builtin.template:
+    src: backup-db.sh.j2
+    dest: "{{ backup_dir }}/backup-db.sh"
+    mode: "0700"
+  tags: [backup]
+
+- name: Deploy restore script
+  ansible.builtin.template:
+    src: restore-db.sh.j2
+    dest: "{{ backup_dir }}/restore-db.sh"
+    mode: "0700"
+  tags: [backup]
+
+- name: Configure backup cron job
+  ansible.builtin.cron:
+    name: "anonxchange database backup"
+    job: "{{ backup_dir }}/backup-db.sh {{ backup_gpg_recipient }} {{ backup_compose_file }} >> /var/log/anonxchange-backup.log 2>&1"
+    minute: "{{ backup_cron_schedule.split(' ')[0] }}"
+    hour: "{{ backup_cron_schedule.split(' ')[1] }}"
+    day: "{{ backup_cron_schedule.split(' ')[2] }}"
+    month: "{{ backup_cron_schedule.split(' ')[3] }}"
+    weekday: "{{ backup_cron_schedule.split(' ')[4] }}"
+    user: root
+  when: backup_gpg_recipient | length > 0
+  tags: [backup, cron]
