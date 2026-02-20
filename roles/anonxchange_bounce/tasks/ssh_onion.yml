@@ -1,0 +1,38 @@
+---
+# =============================================================================
+# anonxchange_bounce — SSH over Tor (post-install transition)
+# =============================================================================
+
+- name: Ensure SSH hidden service line in torrc
+  ansible.builtin.lineinfile:
+    path: "{{ bounce_data_dir }}/tor/torrc"
+    line: "{{ item }}"
+    insertafter: EOF
+  loop:
+    - ""
+    - "# SSH hidden service"
+    - "HiddenServiceDir /var/lib/tor/hidden_services/ssh/"
+    - "HiddenServicePort 22 {{ ansible_default_ipv4.address }}:22"
+    - "HiddenServiceVersion 3"
+  notify: restart bounce stack
+
+- name: Close public SSH port (UFW deny)
+  community.general.ufw:
+    rule: deny
+    port: "22"
+    proto: tcp
+    interface: "{{ ansible_default_ipv4.interface }}"
+    direction: in
+  when: bounce_close_public_ssh | bool
+
+- name: Ensure SSH still allowed on localhost and WireGuard
+  community.general.ufw:
+    rule: allow
+    port: "22"
+    proto: tcp
+    interface: "{{ item }}"
+    direction: in
+  loop:
+    - lo
+    - wg0
+  when: bounce_close_public_ssh | bool

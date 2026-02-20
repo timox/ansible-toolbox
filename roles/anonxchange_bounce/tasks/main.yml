@@ -1,0 +1,28 @@
+---
+# =============================================================================
+# anonxchange_bounce — Main Entry Point
+# =============================================================================
+
+- name: Create directories
+  ansible.builtin.include_tasks: directories.yml
+  when: bounce_state == 'present'
+  tags: [bounce, directories]
+
+- name: Deploy bounce stack
+  ansible.builtin.include_tasks: deploy.yml
+  when: bounce_state == 'present'
+  tags: [bounce, deploy]
+
+- name: Configure SSH over Tor
+  ansible.builtin.include_tasks: ssh_onion.yml
+  when:
+    - bounce_state == 'present'
+    - bounce_ssh_onion | bool
+  tags: [bounce, ssh_onion]
+
+- name: Health check
+  ansible.builtin.include_tasks: healthcheck.yml
+  when:
+    - bounce_state == 'present'
+    - not ansible_check_mode
+  tags: [bounce, healthcheck]

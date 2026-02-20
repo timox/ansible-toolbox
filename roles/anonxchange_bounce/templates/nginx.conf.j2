@@ -1,0 +1,140 @@
+# {{ ansible_managed }}
+worker_processes auto;
+error_log /var/log/nginx/error.log warn;
+pid /var/run/nginx.pid;
+
+events {
+    worker_connections 512;
+}
+
+http {
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+
+    server_tokens off;
+    gzip off;
+    proxy_cache off;
+
+    map $http_x_cover_traffic $is_cover {
+        "1"     1;
+        default 0;
+    }
+
+    log_format anonymous '- [$time_local] "$request" $status $body_bytes_sent '
+                         '"$http_referer" "-" rt=$request_time';
+
+    map $is_cover $loggable {
+        1       0;
+        0       1;
+    }
+    access_log /var/log/nginx/access.log anonymous if=$loggable;
+
+    limit_req_zone $binary_remote_addr zone=general:10m rate={{ bounce_nginx_rate_general }};
+    limit_req_zone $binary_remote_addr zone=auth:10m rate={{ bounce_nginx_rate_auth }};
+    limit_conn_zone $binary_remote_addr zone=connlimit:10m;
+
+    proxy_connect_timeout 60s;
+    proxy_send_timeout    60s;
+    proxy_read_timeout    60s;
+    send_timeout          60s;
+    client_header_timeout 30s;
+    client_body_timeout   60s;
+    keepalive_timeout     65s;
+    client_max_body_size  5m;
+
+    upstream app {
+        server {{ bounce_app_upstream }};
+    }
+
+    upstream admin {
+        server {{ bounce_admin_upstream }};
+    }
+
+    server {
+        listen 8080;
+        server_name _;
+
+        limit_req zone=general burst=50 nodelay;
+        limit_conn connlimit {{ bounce_nginx_conn_limit_main }};
+
+        location ~* /\.(git|env|dockerignore|sql|bak|swp|log) {
+            return 404;
+        }
+
+        location /account {
+            limit_req zone=auth burst=10 nodelay;
+            limit_conn connlimit 10;
+            proxy_set_header X-Real-IP "";
+            proxy_set_header X-Forwarded-For "";
+            proxy_set_header Host $host;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            add_header X-Content-Type-Options "nosniff" always;
+            add_header X-Frame-Options "DENY" always;
+            add_header Referrer-Policy "no-referrer" always;
+            add_header X-Permitted-Cross-Domain-Policies "none" always;
+            proxy_pass http://app;
+        }
+
+        location /contact {
+            limit_req zone=auth burst=10 nodelay;
+            limit_conn connlimit 10;
+            proxy_set_header X-Real-IP "";
+            proxy_set_header X-Forwarded-For "";
+            proxy_set_header Host $host;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            add_header X-Content-Type-Options "nosniff" always;
+            add_header X-Frame-Options "DENY" always;
+            add_header Referrer-Policy "no-referrer" always;
+            add_header X-Permitted-Cross-Domain-Policies "none" always;
+            proxy_pass http://app;
+        }
+
+        location / {
+            proxy_set_header X-Real-IP "";
+            proxy_set_header X-Forwarded-For "";
+            proxy_set_header Host $host;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            add_header X-Content-Type-Options "nosniff" always;
+            add_header X-Frame-Options "DENY" always;
+            add_header Referrer-Policy "no-referrer" always;
+            add_header X-Permitted-Cross-Domain-Policies "none" always;
+            proxy_pass http://app;
+        }
+
+        location = /nginx-health {
+            access_log off;
+            return 200 "ok";
+            add_header Content-Type text/plain;
+        }
+    }
+
+    server {
+        listen 8082;
+        server_name _;
+
+        limit_req zone=auth burst=10 nodelay;
+        limit_conn connlimit {{ bounce_nginx_conn_limit_admin }};
+
+        location ~* /\.(git|env|dockerignore|sql|bak|swp|log) {
+            return 404;
+        }
+
+        location / {
+            proxy_set_header X-Real-IP "";
+            proxy_set_header X-Forwarded-For "";
+            proxy_set_header Host $host;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            add_header X-Content-Type-Options "nosniff" always;
+            add_header X-Frame-Options "DENY" always;
+            add_header Referrer-Policy "no-referrer" always;
+            add_header X-Permitted-Cross-Domain-Policies "none" always;
+            proxy_pass http://admin;
+        }
+
+        location = /nginx-health {
+            access_log off;
+            return 200 "ok";
+            add_header Content-Type text/plain;
+        }
+    }
+}

@@ -1,0 +1,23 @@
+# {{ ansible_managed }}
+SocksPort 0
+Log notice file /var/log/tor/notices.log
+
+# Main app hidden service
+HiddenServiceDir /var/lib/tor/hidden_services/anonxchange/
+HiddenServicePort 80 nginx:8080
+HiddenServiceVersion 3
+
+# Admin app hidden service (separate .onion)
+HiddenServiceDir /var/lib/tor/hidden_services/admin/
+HiddenServicePort 80 nginx:8082
+HiddenServiceVersion 3
+
+# DoS defense
+HiddenServiceEnableIntroDoSDefense 1
+HiddenServiceEnableIntroDoSRatePerSec {{ bounce_tor_dos_rate }}
+HiddenServiceEnableIntroDoSBurstPerSec {{ bounce_tor_dos_burst }}
+
+# Limits
+MaxCircuitDirtiness 600
+CircuitBuildTimeout 60
+MaxMemInQueues 256 MB

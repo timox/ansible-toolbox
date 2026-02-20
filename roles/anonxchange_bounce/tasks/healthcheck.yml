@@ -1,0 +1,26 @@
+---
+# =============================================================================
+# anonxchange_bounce — Health Checks
+# =============================================================================
+
+- name: Wait for nginx health endpoint
+  ansible.builtin.uri:
+    url: "http://localhost:8080/nginx-health"
+    status_code: 200
+  register: _nginx_health
+  until: _nginx_health.status == 200
+  retries: 30
+  delay: 5
+
+- name: Check Tor circuit in logs
+  ansible.builtin.command: >
+    docker compose -f {{ bounce_data_dir }}/docker-compose.yml logs tor --tail 50
+  register: _tor_logs
+  changed_when: false
+  failed_when: false
+
+- name: Report Tor status
+  ansible.builtin.debug:
+    msg: >-
+      Tor circuit: {{ 'OPEN' if 'Opened a circuit' in _tor_logs.stdout
+      else 'NOT YET — Tor may still be bootstrapping' }}

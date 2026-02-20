@@ -1,0 +1,55 @@
+---
+# =============================================================================
+# anonxchange_bounce — Deploy
+# =============================================================================
+
+- name: Deploy docker-compose.yml
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ bounce_data_dir }}/docker-compose.yml"
+    mode: "0644"
+  notify: restart bounce stack
+
+- name: Deploy nginx.conf
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: "{{ bounce_data_dir }}/nginx/nginx.conf"
+    mode: "0644"
+  notify: restart bounce stack
+
+- name: Deploy torrc
+  ansible.builtin.template:
+    src: torrc.j2
+    dest: "{{ bounce_data_dir }}/tor/torrc"
+    mode: "0644"
+  notify: restart bounce stack
+
+- name: Deploy cover traffic script
+  ansible.builtin.template:
+    src: cover.sh.j2
+    dest: "{{ bounce_data_dir }}/cover-traffic/cover.sh"
+    mode: "0755"
+  notify: restart bounce stack
+
+- name: Deploy cover traffic Dockerfile
+  ansible.builtin.copy:
+    src: Dockerfile.cover-traffic
+    dest: "{{ bounce_data_dir }}/cover-traffic/Dockerfile"
+    mode: "0644"
+  notify: restart bounce stack
+
+- name: Copy onion vanity keys (if provided)
+  ansible.builtin.copy:
+    src: "{{ bounce_onion_keys_src }}/"
+    dest: "{{ luks_mount }}/anonxchange/"
+    owner: root
+    group: root
+    mode: "0700"
+  when: bounce_onion_keys_src | length > 0
+
+- name: Start bounce stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ bounce_data_dir }}"
+    state: present
+    build: always
+  register: _bounce_deploy

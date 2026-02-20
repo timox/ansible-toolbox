@@ -1,0 +1,58 @@
+# {{ ansible_managed }}
+networks:
+  tor-external:
+    driver: bridge
+  tor-internal:
+    driver: bridge
+    internal: true
+
+services:
+  tor:
+    image: {{ anonxchange_tor_hs_image }}
+    networks:
+      - tor-external
+      - tor-internal
+    volumes:
+      - ./tor/torrc:/etc/tor/torrc:ro
+      - {{ luks_mount }}:/var/lib/tor/hidden_services
+    depends_on:
+      - nginx
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.5"
+    restart: unless-stopped
+
+  nginx:
+    image: {{ anonxchange_nginx_image }}
+    networks:
+      - tor-internal
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/nginx-health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: "0.25"
+    restart: unless-stopped
+
+  cover-traffic:
+    build: ./cover-traffic
+    networks:
+      - tor-internal
+    depends_on:
+      nginx:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+          cpus: "0.1"
+    restart: unless-stopped

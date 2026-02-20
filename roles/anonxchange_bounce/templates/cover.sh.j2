@@ -1,0 +1,10 @@
+#!/bin/sh
+# {{ ansible_managed }}
+PATHS="/health /pricing /guide /guide/start /guide/workflow /guide/security"
+
+while true; do
+    PATH_TARGET=$(echo "$PATHS" | tr ' ' '\n' | shuf -n 1)
+    wget -q -O /dev/null --header="X-Cover-Traffic: 1" "http://nginx:8080${PATH_TARGET}" 2>/dev/null
+    DELAY=$(awk -v min=1 -v max=10 'BEGIN{srand(); printf "%d", min+rand()*(max-min)}')
+    sleep "$DELAY"
+done

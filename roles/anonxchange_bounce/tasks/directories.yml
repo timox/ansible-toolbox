@@ -1,0 +1,17 @@
+---
+# =============================================================================
+# anonxchange_bounce — Directories
+# =============================================================================
+
+- name: Create bounce data directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ bounce_data_dir }}"
+    - "{{ bounce_data_dir }}/nginx"
+    - "{{ bounce_data_dir }}/tor"
+    - "{{ bounce_data_dir }}/cover-traffic"

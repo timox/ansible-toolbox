@@ -1,0 +1,6 @@
+---
+- name: restart bounce stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ bounce_data_dir }}"
+    state: present
+    build: always

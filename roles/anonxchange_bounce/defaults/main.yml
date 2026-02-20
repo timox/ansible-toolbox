@@ -1,0 +1,29 @@
+---
+# =============================================================================
+# anonxchange_bounce role defaults
+# =============================================================================
+
+# -- Directories --------------------------------------------------------------
+
+bounce_data_dir: /data/anonxchange-bounce
+bounce_state: present
+
+# -- nginx --------------------------------------------------------------------
+
+bounce_nginx_rate_general: "30r/s"
+bounce_nginx_rate_auth: "5r/s"
+bounce_nginx_conn_limit_main: 20
+bounce_nginx_conn_limit_admin: 5
+bounce_app_upstream: "10.0.0.2:3000"
+bounce_admin_upstream: "10.0.0.2:3002"
+
+# -- Tor ----------------------------------------------------------------------
+
+bounce_tor_dos_rate: 25
+bounce_tor_dos_burst: 200
+bounce_onion_keys_src: ""
+
+# -- SSH over Tor (post-install) ----------------------------------------------
+
+bounce_ssh_onion: true
+bounce_close_public_ssh: false

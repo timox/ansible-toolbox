@@ -1,0 +1,5 @@
+FROM alpine:3.19
+RUN apk add --no-cache wget coreutils
+COPY cover.sh /cover.sh
+RUN chmod +x /cover.sh
+CMD ["/bin/sh", "/cover.sh"]
