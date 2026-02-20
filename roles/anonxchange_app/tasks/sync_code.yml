@@ -1,0 +1,28 @@
+---
+# =============================================================================
+# anonxchange_app — Sync source code
+# =============================================================================
+
+- name: Sync code via git
+  ansible.builtin.git:
+    repo: "{{ anonxchange_repo_url }}"
+    dest: "{{ app_data_dir }}/src"
+    version: "{{ anonxchange_repo_branch }}"
+    force: true
+  when: anonxchange_deploy_method == 'git'
+  notify: restart app stack
+
+- name: Sync code via rsync
+  ansible.posix.synchronize:
+    src: "{{ playbook_dir }}/../../../anonXchange/"
+    dest: "{{ app_data_dir }}/src/"
+    delete: true
+    rsync_opts:
+      - "--exclude=.git"
+      - "--exclude=node_modules"
+      - "--exclude=test"
+      - "--exclude=docs"
+      - "--exclude=.env"
+      - "--exclude=srcexamples"
+  when: anonxchange_deploy_method == 'rsync'
+  notify: restart app stack

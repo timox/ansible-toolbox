@@ -1,0 +1,24 @@
+---
+# =============================================================================
+# anonxchange_app — Deploy
+# =============================================================================
+
+- name: Deploy .env file
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ app_data_dir }}/src/.env"
+    owner: root
+    group: root
+    mode: "0600"
+  notify: restart app stack
+
+- name: Start app stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_data_dir }}/src"
+    files:
+      - infra/app/docker-compose.prod.yml
+    env_files:
+      - .env
+    state: present
+    build: always
+  register: _app_deploy

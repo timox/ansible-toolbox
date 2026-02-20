@@ -1,0 +1,10 @@
+---
+- name: restart app stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_data_dir }}/src"
+    files:
+      - infra/app/docker-compose.prod.yml
+    env_files:
+      - .env
+    state: present
+    build: always

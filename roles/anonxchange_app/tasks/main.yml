@@ -1,0 +1,26 @@
+---
+# =============================================================================
+# anonxchange_app — Main Entry Point
+# =============================================================================
+
+- name: Create directories
+  ansible.builtin.include_tasks: directories.yml
+  when: app_state == 'present'
+  tags: [app, directories]
+
+- name: Sync source code
+  ansible.builtin.include_tasks: sync_code.yml
+  when: app_state == 'present'
+  tags: [app, sync, deploy]
+
+- name: Deploy app stack
+  ansible.builtin.include_tasks: deploy.yml
+  when: app_state == 'present'
+  tags: [app, deploy]
+
+- name: Health check
+  ansible.builtin.include_tasks: healthcheck.yml
+  when:
+    - app_state == 'present'
+    - not ansible_check_mode
+  tags: [app, healthcheck]

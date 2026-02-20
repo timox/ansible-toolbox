@@ -1,0 +1,17 @@
+---
+# =============================================================================
+# anonxchange_app — Health Checks
+# =============================================================================
+
+- name: Wait for app health endpoint
+  ansible.builtin.uri:
+    url: "http://localhost:3000/health"
+    status_code: 200
+  register: _app_health
+  until: _app_health.status == 200
+  retries: "{{ app_health_retries }}"
+  delay: "{{ app_health_delay }}"
+
+- name: Report app status
+  ansible.builtin.debug:
+    msg: "anonXchange app is healthy"
