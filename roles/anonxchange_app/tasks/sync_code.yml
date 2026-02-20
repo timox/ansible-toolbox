@@ -14,7 +14,7 @@
 
 - name: Sync code via rsync
   ansible.posix.synchronize:
-    src: "{{ playbook_dir }}/../../../anonXchange/"
+    src: "{{ app_local_src_path }}"
     dest: "{{ app_data_dir }}/src/"
     delete: true
     rsync_opts:

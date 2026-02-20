@@ -12,6 +12,16 @@
     mode: "0600"
   notify: restart app stack
 
+- name: Deploy tenant PGP private key
+  ansible.builtin.copy:
+    content: "{{ app_tenant_pgp_private_key }}"
+    dest: "{{ app_data_dir }}/src/tenant-key.asc"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  notify: restart app stack
+
 - name: Start app stack
   community.docker.docker_compose_v2:
     project_src: "{{ app_data_dir }}/src"

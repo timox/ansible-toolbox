@@ -7,3 +7,4 @@ app_data_dir: /data/anonxchange
 app_state: present
 app_health_retries: 30
 app_health_delay: 10
+app_local_src_path: "{{ playbook_dir }}/../../../anonXchange/"
