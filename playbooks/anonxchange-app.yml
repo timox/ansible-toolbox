@@ -1,0 +1,43 @@
+---
+# =============================================================================
+# anonxchange-app.yml — Deploy anonXchange App VPS
+# =============================================================================
+#
+# Deploys the application VPS (VPS 2):
+#   - OS bootstrap (SSH hardening, packages, Docker)
+#   - WireGuard tunnel to bounce VPS
+#   - Full Docker stack (app, DB, MinIO, wallet-rpc, notifier, tor-proxy, admin)
+#   - Automated backup cron
+#
+# Usage:
+#   ansible-playbook playbooks/anonxchange-app.yml
+#   ansible-playbook playbooks/anonxchange-app.yml --tags deploy
+#   ansible-playbook playbooks/anonxchange-app.yml --check --diff
+#
+# =============================================================================
+
+- name: Deploy anonXchange App VPS
+  hosts: anonxchange_app
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Wait for connection
+      ansible.builtin.wait_for_connection:
+        timeout: 30
+
+  roles:
+    - role: bootstrap
+      tags: [bootstrap]
+
+    - role: docker_setup
+      tags: [docker]
+
+    - role: wireguard
+      tags: [wireguard]
+
+    - role: anonxchange_app
+      tags: [app, deploy]
+
+    - role: anonxchange_backup
+      tags: [backup]

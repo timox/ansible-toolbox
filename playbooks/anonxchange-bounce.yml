@@ -1,0 +1,56 @@
+---
+# =============================================================================
+# anonxchange-bounce.yml — Deploy anonXchange Bounce VPS
+# =============================================================================
+#
+# Deploys the Tor reverse proxy VPS (VPS 1):
+#   - OS bootstrap (SSH hardening, packages, Docker)
+#   - WireGuard tunnel to app VPS
+#   - LUKS encrypted volume for Tor keys
+#   - Tor hidden service + nginx + cover traffic
+#
+# Usage:
+#   ansible-playbook playbooks/anonxchange-bounce.yml
+#   ansible-playbook playbooks/anonxchange-bounce.yml --tags deploy
+#   ansible-playbook playbooks/anonxchange-bounce.yml --check --diff
+#
+# =============================================================================
+
+- name: Deploy anonXchange Bounce VPS
+  hosts: anonxchange_bounce
+  become: true
+  gather_facts: true
+
+  pre_tasks:
+    - name: Wait for connection
+      ansible.builtin.wait_for_connection:
+        timeout: 30
+
+  roles:
+    - role: bootstrap
+      tags: [bootstrap]
+
+    - role: docker_setup
+      tags: [docker]
+
+    - role: wireguard
+      tags: [wireguard]
+
+    - role: luks
+      tags: [luks]
+
+    - role: anonxchange_bounce
+      tags: [bounce, deploy]
+
+  post_tasks:
+    - name: Display onion addresses
+      ansible.builtin.command: "cat {{ luks_mount }}/anonxchange/hostname"
+      register: _onion_main
+      changed_when: false
+      failed_when: false
+      tags: [always]
+
+    - name: Show main .onion address
+      ansible.builtin.debug:
+        msg: "Main app: {{ _onion_main.stdout | default('not yet generated') }}"
+      tags: [always]

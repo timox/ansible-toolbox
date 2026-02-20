@@ -1,0 +1,21 @@
+---
+# =============================================================================
+# kvm-anonxchange.yml — Provision/destroy test VMs for anonXchange
+# =============================================================================
+#
+# Creates or destroys 2 Debian 12 KVM VMs for testing the deployment.
+#
+# Usage:
+#   ansible-playbook playbooks/kvm-anonxchange.yml                    # Create VMs
+#   ansible-playbook playbooks/kvm-anonxchange.yml -e kvm_state=absent # Destroy VMs
+#
+# =============================================================================
+
+- name: Provision anonXchange test VMs
+  hosts: kvm_hosts
+  become: true
+  gather_facts: true
+
+  roles:
+    - role: kvm_provision
+      tags: [kvm]

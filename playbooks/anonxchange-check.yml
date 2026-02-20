@@ -1,0 +1,42 @@
+---
+# =============================================================================
+# anonxchange-check.yml — Health check both VPS
+# =============================================================================
+#
+# Usage:
+#   ansible-playbook playbooks/anonxchange-check.yml
+#
+# =============================================================================
+
+- name: Check anonXchange Infrastructure
+  hosts: anonxchange
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Check WireGuard interface is up
+      ansible.builtin.command: "wg show {{ wg_interface | default('wg0') }}"
+      register: _wg_status
+      changed_when: false
+      failed_when: _wg_status.rc != 0
+
+    - name: Check Docker services are running
+      ansible.builtin.command: docker ps --format "{{ '{{' }}.Names{{ '}}' }}\t{{ '{{' }}.Status{{ '}}' }}"
+      register: _docker_ps
+      changed_when: false
+
+    - name: Display Docker services
+      ansible.builtin.debug:
+        msg: "{{ _docker_ps.stdout_lines }}"
+
+    - name: Check app health endpoint
+      ansible.builtin.uri:
+        url: "http://localhost:3000/health"
+        status_code: 200
+      when: inventory_hostname in groups['anonxchange_app']
+
+    - name: Check nginx health endpoint
+      ansible.builtin.uri:
+        url: "http://localhost:8080/nginx-health"
+        status_code: 200
+      when: inventory_hostname in groups['anonxchange_bounce']
