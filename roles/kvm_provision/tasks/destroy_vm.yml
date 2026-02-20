@@ -1,0 +1,24 @@
+---
+# =============================================================================
+# kvm_provision — Destroy a single VM
+# =============================================================================
+
+- name: "Check if VM {{ vm.name }} exists"
+  ansible.builtin.command: "virsh dominfo {{ vm.name }}"
+  register: _vm_exists
+  changed_when: false
+  failed_when: false
+
+- name: "Destroy VM {{ vm.name }}"
+  ansible.builtin.command: "virsh destroy {{ vm.name }}"
+  when: _vm_exists.rc == 0
+  failed_when: false
+
+- name: "Undefine VM {{ vm.name }}"
+  ansible.builtin.command: "virsh undefine {{ vm.name }} --remove-all-storage"
+  when: _vm_exists.rc == 0
+
+- name: "Clean up cloud-init ISO for {{ vm.name }}"
+  ansible.builtin.file:
+    path: "{{ kvm_pool_path }}/{{ vm.name }}-cidata.iso"
+    state: absent

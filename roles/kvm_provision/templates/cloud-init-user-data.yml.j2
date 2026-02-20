@@ -1,0 +1,21 @@
+#cloud-config
+hostname: {{ vm.name }}
+manage_etc_hosts: true
+users:
+  - name: debian
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - {{ kvm_ssh_public_key }}
+package_update: true
+packages:
+  - curl
+  - wget
+  - vim
+  - htop
+{% if vm.role == 'bounce' %}
+  - ufw
+{% endif %}
+runcmd:
+  - growpart /dev/vda 1 || true
+  - resize2fs /dev/vda1 || true

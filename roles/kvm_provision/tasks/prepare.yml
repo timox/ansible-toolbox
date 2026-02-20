@@ -1,0 +1,28 @@
+---
+# =============================================================================
+# kvm_provision — Prepare
+# =============================================================================
+
+- name: Install required packages
+  ansible.builtin.apt:
+    name:
+      - qemu-kvm
+      - libvirt-daemon-system
+      - virtinst
+      - cloud-image-utils
+      - genisoimage
+    state: present
+    update_cache: true
+
+- name: Ensure libvirtd is running
+  ansible.builtin.systemd:
+    name: libvirtd
+    state: started
+    enabled: true
+
+- name: Download Debian cloud image
+  ansible.builtin.get_url:
+    url: "{{ kvm_debian_image_url }}"
+    dest: "{{ kvm_pool_path }}/debian-12-cloud.qcow2"
+    checksum: "{{ kvm_debian_image_checksum if kvm_debian_image_checksum else omit }}"
+    mode: "0644"

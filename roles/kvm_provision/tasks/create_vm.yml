@@ -1,0 +1,63 @@
+---
+# =============================================================================
+# kvm_provision — Create a single VM
+# =============================================================================
+
+- name: "Check if VM {{ vm.name }} exists"
+  ansible.builtin.command: "virsh dominfo {{ vm.name }}"
+  register: _vm_exists
+  changed_when: false
+  failed_when: false
+
+- name: "Create disk for {{ vm.name }}"
+  ansible.builtin.command: >
+    qemu-img create -f qcow2 -F qcow2
+    -b {{ kvm_pool_path }}/debian-12-cloud.qcow2
+    {{ kvm_pool_path }}/{{ vm.name }}.qcow2
+    {{ vm.disk_gb }}G
+  when: _vm_exists.rc != 0
+
+- name: "Generate cloud-init user-data for {{ vm.name }}"
+  ansible.builtin.template:
+    src: cloud-init-user-data.yml.j2
+    dest: "/tmp/{{ vm.name }}-user-data.yml"
+    mode: "0644"
+  when: _vm_exists.rc != 0
+
+- name: "Generate cloud-init network config for {{ vm.name }}"
+  ansible.builtin.template:
+    src: cloud-init-network.yml.j2
+    dest: "/tmp/{{ vm.name }}-network.yml"
+    mode: "0644"
+  when: _vm_exists.rc != 0
+
+- name: "Create cloud-init ISO for {{ vm.name }}"
+  ansible.builtin.command: >
+    cloud-localds
+    --network-config /tmp/{{ vm.name }}-network.yml
+    {{ kvm_pool_path }}/{{ vm.name }}-cidata.iso
+    /tmp/{{ vm.name }}-user-data.yml
+  when: _vm_exists.rc != 0
+
+- name: "Create VM {{ vm.name }}"
+  ansible.builtin.command: >
+    virt-install
+    --name {{ vm.name }}
+    --memory {{ vm.memory_mb }}
+    --vcpus {{ vm.vcpus }}
+    --disk path={{ kvm_pool_path }}/{{ vm.name }}.qcow2,format=qcow2
+    --disk path={{ kvm_pool_path }}/{{ vm.name }}-cidata.iso,device=cdrom
+    --os-variant debian12
+    --network network={{ kvm_network }}
+    --graphics none
+    --console pty,target_type=serial
+    --import
+    --noautoconsole
+  when: _vm_exists.rc != 0
+
+- name: "Wait for {{ vm.name }} to be reachable"
+  ansible.builtin.wait_for:
+    host: "{{ vm.ip }}"
+    port: 22
+    timeout: 120
+  when: _vm_exists.rc != 0

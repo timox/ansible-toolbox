@@ -1,0 +1,12 @@
+---
+# =============================================================================
+# kvm_provision role defaults
+# =============================================================================
+
+kvm_state: present
+kvm_pool_path: /var/lib/libvirt/images
+kvm_network: default
+kvm_debian_image_url: "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2"
+kvm_debian_image_checksum: ""
+kvm_ssh_public_key: ""
+kvm_anonxchange_vms: []

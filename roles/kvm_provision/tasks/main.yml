@@ -1,0 +1,27 @@
+---
+# =============================================================================
+# kvm_provision — Main Entry Point
+# =============================================================================
+
+- name: Prepare KVM environment
+  ansible.builtin.include_tasks: prepare.yml
+  when: kvm_state == 'present'
+  tags: [kvm, prepare]
+
+- name: Create test VMs
+  ansible.builtin.include_tasks: create_vm.yml
+  loop: "{{ kvm_anonxchange_vms }}"
+  loop_control:
+    loop_var: vm
+    label: "{{ vm.name }}"
+  when: kvm_state == 'present'
+  tags: [kvm, create]
+
+- name: Destroy test VMs
+  ansible.builtin.include_tasks: destroy_vm.yml
+  loop: "{{ kvm_anonxchange_vms }}"
+  loop_control:
+    loop_var: vm
+    label: "{{ vm.name }}"
+  when: kvm_state == 'absent'
+  tags: [kvm, destroy]
