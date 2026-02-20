@@ -1,0 +1,41 @@
+---
+# =============================================================================
+# anonXchange App VPS — Variables
+# =============================================================================
+
+# -- SSH access via bounce (ProxyJump) ----------------------------------------
+
+ansible_ssh_common_args: >-
+  -o ProxyJump=debian@{{ hostvars["bounce-vps"].ansible_host }}
+
+# -- WireGuard (app side = client, connects to bounce) ------------------------
+
+wg_address: "10.0.0.2/24"
+wg_private_key: "{{ vault_wg_app_private_key }}"
+wg_peer_public_key: "{{ vault_wg_bounce_public_key }}"
+wg_peer_endpoint: "{{ hostvars['bounce-vps'].ansible_host }}:51820"
+wg_peer_allowed_ips: "10.0.0.1/32"
+wg_persistent_keepalive: 25
+
+# -- App stack ----------------------------------------------------------------
+
+app_data_dir: /data/anonxchange
+app_postgres_user: "{{ vault_postgres_user }}"
+app_postgres_password: "{{ vault_postgres_password }}"
+app_postgres_db: "{{ vault_postgres_db }}"
+app_challenge_hmac_secret: "{{ vault_challenge_hmac_secret }}"
+app_api_secret_master_key: "{{ vault_api_secret_master_key }}"
+app_admin_session_secret: "{{ vault_admin_session_secret }}"
+app_tenant_pgp_private_key: "{{ vault_tenant_pgp_private_key }}"
+app_minio_access_key: "{{ vault_minio_access_key }}"
+app_minio_secret_key: "{{ vault_minio_secret_key }}"
+app_onion_host: "{{ vault_onion_host }}"
+app_monero_daemon: "{{ vault_monero_daemon }}"
+app_tenant_wallet_address: "{{ vault_tenant_wallet_address }}"
+
+# -- Backup -------------------------------------------------------------------
+
+backup_gpg_recipient: "{{ vault_backup_gpg_recipient }}"
+backup_cron_schedule: "0 3 * * 0"
+backup_retention_days: 30
+backup_dir: /data/anonxchange/backups

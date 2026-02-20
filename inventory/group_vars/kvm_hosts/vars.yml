@@ -1,0 +1,26 @@
+---
+# =============================================================================
+# KVM Hosts — Variables for test VM provisioning
+# =============================================================================
+
+kvm_pool_path: /var/lib/libvirt/images
+kvm_network: default
+kvm_debian_image_url: "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2"
+kvm_debian_image_checksum: ""
+kvm_ssh_public_key: "{{ lookup('file', '~/.ssh/id_ed25519.pub') }}"
+
+# -- anonXchange test VMs ----------------------------------------------------
+
+kvm_anonxchange_vms:
+  - name: anon-bounce-test
+    vcpus: 2
+    memory_mb: 2048
+    disk_gb: 20
+    ip: "192.168.122.10"
+    role: bounce
+  - name: anon-app-test
+    vcpus: 2
+    memory_mb: 4096
+    disk_gb: 40
+    ip: "192.168.122.11"
+    role: app

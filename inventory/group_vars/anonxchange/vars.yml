@@ -1,0 +1,30 @@
+---
+# =============================================================================
+# anonXchange — Shared Variables (all VPS)
+# =============================================================================
+
+# -- Docker images -----------------------------------------------------------
+
+anonxchange_node_image: "node:20-alpine"
+anonxchange_postgres_image: "postgres:16-alpine"
+anonxchange_minio_image: "minio/minio:latest"
+anonxchange_wallet_rpc_image: "ghcr.io/sethforprivacy/simple-monero-wallet-rpc:latest"
+anonxchange_tor_proxy_image: "peterdavehello/tor-socks-proxy:latest"
+anonxchange_tor_hs_image: "goldy/tor-hidden-service:latest"
+anonxchange_nginx_image: "nginx:alpine"
+
+# -- Application config ------------------------------------------------------
+
+anonxchange_monero_network: mainnet
+anonxchange_xmr_price_usd: 150
+anonxchange_xmr_price_eur: 140
+anonxchange_data_retention_days: 90
+anonxchange_base_commission_rate: "0.02"
+anonxchange_auto_finalize_default_days: 14
+anonxchange_brand_name: "anonXchange"
+
+# -- Source code --------------------------------------------------------------
+
+anonxchange_repo_url: "https://github.com/xxx/anonXchange.git"
+anonxchange_repo_branch: main
+anonxchange_deploy_method: rsync

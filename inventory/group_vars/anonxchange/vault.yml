@@ -1,0 +1,51 @@
+---
+# =============================================================================
+# anonXchange — Vault Secrets (ansible-vault encrypted)
+# =============================================================================
+# Encrypt: ansible-vault encrypt inventory/group_vars/anonxchange/vault.yml
+# Edit:    ansible-vault edit inventory/group_vars/anonxchange/vault.yml
+
+# -- Database -----------------------------------------------------------------
+
+vault_postgres_user: anonxchange
+vault_postgres_password: "CHANGE_ME_openssl_rand_base64_32"
+vault_postgres_db: anonxchange
+
+# -- Application secrets ------------------------------------------------------
+
+vault_challenge_hmac_secret: "CHANGE_ME_openssl_rand_hex_32"
+vault_api_secret_master_key: "CHANGE_ME_openssl_rand_hex_32"
+vault_admin_session_secret: "CHANGE_ME_openssl_rand_hex_32"
+vault_tenant_pgp_private_key: |
+  -----BEGIN PGP PRIVATE KEY BLOCK-----
+  CHANGE_ME
+  -----END PGP PRIVATE KEY BLOCK-----
+
+# -- MinIO --------------------------------------------------------------------
+
+vault_minio_access_key: "CHANGE_ME_openssl_rand_base64_16"
+vault_minio_secret_key: "CHANGE_ME_openssl_rand_base64_32"
+
+# -- Tor ----------------------------------------------------------------------
+
+vault_onion_host: "xxxxxxxxxxxx.onion"
+
+# -- Monero -------------------------------------------------------------------
+
+vault_monero_daemon: "127.0.0.1:18081"
+vault_tenant_wallet_address: "4CHANGE_ME"
+
+# -- WireGuard ----------------------------------------------------------------
+
+vault_wg_bounce_private_key: "CHANGE_ME_wg_genkey"
+vault_wg_bounce_public_key: "CHANGE_ME_derived"
+vault_wg_app_private_key: "CHANGE_ME_wg_genkey"
+vault_wg_app_public_key: "CHANGE_ME_derived"
+
+# -- LUKS ---------------------------------------------------------------------
+
+vault_luks_passphrase: "CHANGE_ME_openssl_rand_base64_48"
+
+# -- Backup -------------------------------------------------------------------
+
+vault_backup_gpg_recipient: "admin@anonxchange.onion"

@@ -1,0 +1,39 @@
+---
+# =============================================================================
+# anonXchange Bounce VPS — Variables
+# =============================================================================
+
+# -- WireGuard (bounce side = server, listens) --------------------------------
+
+wg_address: "10.0.0.1/24"
+wg_listen_port: 51820
+wg_private_key: "{{ vault_wg_bounce_private_key }}"
+wg_peer_public_key: "{{ vault_wg_app_public_key }}"
+wg_peer_allowed_ips: "10.0.0.2/32"
+wg_post_up: "iptables -A FORWARD -i wg0 -o docker0 -j ACCEPT"
+wg_post_down: "iptables -D FORWARD -i wg0 -o docker0 -j ACCEPT"
+
+# -- LUKS ---------------------------------------------------------------------
+
+luks_device: /dev/vdb
+luks_name: tor-keys
+luks_mount: /mnt/tor-keys
+luks_passphrase: "{{ vault_luks_passphrase }}"
+luks_directories:
+  - { path: anonxchange, owner: "root", mode: "0700" }
+  - { path: admin, owner: "root", mode: "0700" }
+
+# -- Bounce stack -------------------------------------------------------------
+
+bounce_data_dir: /data/anonxchange-bounce
+bounce_nginx_rate_general: "30r/s"
+bounce_nginx_rate_auth: "5r/s"
+bounce_nginx_conn_limit_main: 20
+bounce_nginx_conn_limit_admin: 5
+bounce_tor_dos_rate: 25
+bounce_tor_dos_burst: 200
+bounce_app_upstream: "10.0.0.2:3000"
+bounce_admin_upstream: "10.0.0.2:3002"
+bounce_onion_keys_src: ""
+bounce_ssh_onion: true
+bounce_close_public_ssh: false
