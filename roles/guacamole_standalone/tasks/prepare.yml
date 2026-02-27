@@ -1,0 +1,76 @@
+---
+# =============================================================================
+# GUACAMOLE STANDALONE - VM Preparation (directories, sysctl)
+# =============================================================================
+
+- name: Ensure /data directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ guacamole_standalone_data_dir }}/guacamole/postgres"
+    - "{{ guacamole_standalone_data_dir }}/guacamole/drive"
+    - "{{ guacamole_standalone_data_dir }}/guacamole/record"
+    - "{{ guacamole_standalone_data_dir }}/guacamole/certs"
+    - "{{ guacamole_standalone_data_dir }}/portal/vault"
+    - "{{ guacamole_standalone_data_dir }}/config"
+    - "{{ guacamole_standalone_data_dir }}/logs/guacamole"
+
+- name: Ensure /save directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ guacamole_standalone_save_dir }}/postgres"
+    - "{{ guacamole_standalone_save_dir }}/vault"
+    - "{{ guacamole_standalone_save_dir }}/config"
+
+- name: Set PostgreSQL data directory ownership (alpine uid 70)
+  ansible.builtin.file:
+    path: "{{ guacamole_standalone_data_dir }}/guacamole/postgres"
+    owner: "70"
+    group: "70"
+    mode: '0700'
+
+- name: Ensure install directory exists
+  ansible.builtin.file:
+    path: "{{ guacamole_standalone_install_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Apply sysctl optimizations
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_set: true
+    reload: true
+  loop:
+    - { key: "vm.swappiness", value: "10" }
+    - { key: "net.core.somaxconn", value: "65535" }
+    - { key: "net.ipv4.tcp_max_syn_backlog", value: "65535" }
+    - { key: "fs.file-max", value: "1048576" }
+  loop_control:
+    label: "{{ item.key }}={{ item.value }}"
+
+- name: Configure Docker daemon logging
+  ansible.builtin.copy:
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "{{ guacamole_standalone_log_max_size }}",
+          "max-file": "{{ guacamole_standalone_log_max_file }}"
+        },
+        "storage-driver": "overlay2"
+      }
+    dest: /etc/docker/daemon.json
+    mode: '0644'
+  notify: restart docker
+
+- name: Ensure Docker is running
+  ansible.builtin.systemd:
+    name: docker
+    state: started
+    enabled: true

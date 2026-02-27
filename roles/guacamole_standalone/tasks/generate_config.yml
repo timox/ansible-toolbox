@@ -1,0 +1,32 @@
+---
+# =============================================================================
+# GUACAMOLE STANDALONE - Configuration Generation
+# =============================================================================
+
+- name: Generate .env file from template
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ guacamole_standalone_install_dir }}/.env"
+    owner: root
+    group: root
+    mode: '0600'
+  no_log: true
+  notify:
+    - restart guac-portal
+    - restart guacamole-web
+
+- name: Generate guacamole.properties from template
+  ansible.builtin.template:
+    src: guacamole.properties.j2
+    dest: "{{ guacamole_standalone_data_dir }}/config/guacamole.properties"
+    owner: root
+    group: root
+    mode: '0644'
+  no_log: true
+  notify: restart guacamole-web
+
+- name: Verify guacamole.properties was created
+  ansible.builtin.stat:
+    path: "{{ guacamole_standalone_data_dir }}/config/guacamole.properties"
+  register: guac_props_check
+  failed_when: not guac_props_check.stat.exists

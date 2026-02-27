@@ -1,0 +1,38 @@
+---
+# =============================================================================
+# GUACAMOLE STANDALONE - Handlers
+# =============================================================================
+
+- name: restart guacamole-web
+  community.docker.docker_container:
+    name: guacamole-web
+    state: started
+    restart: true
+  listen: restart guacamole-web
+
+- name: restart guacamole-daemon
+  community.docker.docker_container:
+    name: guacamole-daemon
+    state: started
+    restart: true
+  listen: restart guacamole-daemon
+
+- name: restart guac-portal
+  community.docker.docker_container:
+    name: guac-portal
+    state: started
+    restart: true
+  listen: restart guac-portal
+
+- name: restart guacamole-db
+  community.docker.docker_container:
+    name: guacamole-db
+    state: started
+    restart: true
+  listen: restart guacamole-db
+
+- name: restart docker
+  ansible.builtin.systemd:
+    name: docker
+    state: restarted
+  listen: restart docker

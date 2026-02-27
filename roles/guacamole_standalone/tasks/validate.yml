@@ -1,0 +1,35 @@
+---
+# =============================================================================
+# GUACAMOLE STANDALONE - Prerequisite Validation
+# =============================================================================
+
+- name: Validate required variables are defined
+  ansible.builtin.assert:
+    that:
+      - keycloak_issuer is defined
+      - keycloak_issuer | length > 0
+      - domain is defined
+      - domain | length > 0
+      - guacamole_standalone_oidc_client_id is defined
+      - guacamole_standalone_oidc_client_id | length > 0
+      - vault_guacamole_standalone_oidc_client_secret is defined
+      - vault_guacamole_standalone_oidc_client_secret | length > 0
+      - guacamole_standalone_public_url is defined
+      - guacamole_standalone_public_url | length > 0
+    fail_msg: >
+      Required variables missing. Check: keycloak_issuer, domain,
+      guacamole_standalone_oidc_client_id, vault_guacamole_standalone_oidc_client_secret,
+      guacamole_standalone_public_url
+
+- name: Validate KEYCLOAK_ISSUER format
+  ansible.builtin.assert:
+    that:
+      - keycloak_issuer is match('^https?://')
+      - keycloak_issuer is match('.*/realms/[^/]+$')
+    fail_msg: "keycloak_issuer must be in format: https://kc.example.com/realms/POC"
+
+- name: Validate Docker is available
+  ansible.builtin.command: docker --version
+  changed_when: false
+  register: docker_check
+  failed_when: docker_check.rc != 0

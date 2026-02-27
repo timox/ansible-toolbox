@@ -1,0 +1,23 @@
+---
+# =============================================================================
+# GUACAMOLE SERVERS - Group Variables
+# =============================================================================
+# Variables specifiques aux serveurs Guacamole Standalone
+
+# URL publique (reverse proxy externe pointe ici)
+guacamole_standalone_public_url: "https://guacamole.{{ domain }}"
+
+# Ports exposes sur l'hote
+guacamole_standalone_portal_port: 3000
+guacamole_standalone_guacamole_port: 8080
+
+# OIDC client (a creer dans Keycloak)
+guacamole_standalone_oidc_client_id: guacamole-standalone
+
+# JVM Tomcat
+guacamole_standalone_java_xms: 512m
+guacamole_standalone_java_xmx: 2g
+
+# Sauvegarde quotidienne a 2h00
+guacamole_standalone_backup_cron_hour: "2"
+guacamole_standalone_backup_cron_minute: "0"

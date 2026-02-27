@@ -1,0 +1,76 @@
+---
+# =============================================================================
+# GUACAMOLE-STANDALONE.YML - Deploiement Guacamole Autonome
+# =============================================================================
+#
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │              DEPLOIEMENT GUACAMOLE STANDALONE                          │
+# ├─────────────────────────────────────────────────────────────────────────┤
+# │                                                                         │
+# │  VM dediee avec :                                                       │
+# │    - guac-portal   : OIDC + Credential Vault + JSON Auth                │
+# │    - guacamole-web : Tomcat + extensions (json, openid, jdbc)           │
+# │    - guacamole-daemon : FreeRDP custom (network_mode: host)             │
+# │    - guacamole-db  : PostgreSQL (connexions Guacamole)                  │
+# │                                                                         │
+# │  PREREQUIS :                                                            │
+# │    - VM Debian/Ubuntu avec SSH                                          │
+# │    - Client Keycloak cree dans le realm                                 │
+# │    - Reverse proxy externe vers la VM                                   │
+# │                                                                         │
+# │  VARIABLES REQUISES (vault) :                                           │
+# │    vault_guacamole_standalone_oidc_client_secret                        │
+# │                                                                         │
+# │  VARIABLES REQUISES (group_vars) :                                      │
+# │    guacamole_standalone_public_url                                      │
+# │    keycloak_issuer                                                      │
+# │    domain                                                               │
+# │                                                                         │
+# └─────────────────────────────────────────────────────────────────────────┘
+#
+# Usage:
+#   ansible-playbook playbooks/guacamole-standalone.yml
+#   ansible-playbook playbooks/guacamole-standalone.yml --check --diff
+#   ansible-playbook playbooks/guacamole-standalone.yml --tags deploy
+#   ansible-playbook playbooks/guacamole-standalone.yml -e guacamole_standalone_state=absent
+#
+# =============================================================================
+
+- name: Deploy Guacamole Standalone
+  hosts: guacamole_servers
+  become: true
+
+  pre_tasks:
+    - name: Wait for SSH connection
+      ansible.builtin.wait_for_connection:
+        timeout: 30
+
+    - name: Gather facts
+      ansible.builtin.setup:
+
+  roles:
+    - role: guacamole_standalone
+      tags: [guacamole-standalone, deploy]
+
+  post_tasks:
+    - name: Deployment summary
+      ansible.builtin.debug:
+        msg:
+          - "================================================"
+          - "  Guacamole Standalone - Deployment Complete"
+          - "================================================"
+          - ""
+          - "  Portal:    {{ guacamole_standalone_public_url }}"
+          - "  Guacamole: {{ guacamole_standalone_public_url }}/guacamole/"
+          - "  Keycloak:  {{ keycloak_issuer }}"
+          - ""
+          - "  Data:      {{ guacamole_standalone_data_dir }}"
+          - "  Backups:   {{ guacamole_standalone_save_dir }}"
+          - "  Install:   {{ guacamole_standalone_install_dir }}"
+          - ""
+          - "  Next steps:"
+          - "  1. Configure reverse proxy -> VM:{{ guacamole_standalone_portal_port }} et VM:{{ guacamole_standalone_guacamole_port }}"
+          - "  2. Create RDP connections: {{ guacamole_standalone_install_dir }}/guacamole/scripts/manage-connections.sh"
+          - "  3. Default Guacamole admin: guacadmin / guacadmin (change immediately)"
+          - "================================================"
+      tags: [always]

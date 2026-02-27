@@ -1,0 +1,44 @@
+---
+# =============================================================================
+# GUACAMOLE STANDALONE ROLE - Main Tasks
+# =============================================================================
+# Deploys standalone Guacamole with OIDC + JSON Auth + Credential Vault
+# Target: dedicated VM (not the main portal server)
+
+- name: Validate guacamole_standalone state variable
+  ansible.builtin.assert:
+    that:
+      - guacamole_standalone_state in ['present', 'absent']
+    fail_msg: "guacamole_standalone_state must be 'present' or 'absent'"
+
+- name: Include prerequisite validation
+  ansible.builtin.include_tasks: validate.yml
+  when: guacamole_standalone_state == 'present'
+
+- name: Include VM preparation
+  ansible.builtin.include_tasks: prepare.yml
+  when: guacamole_standalone_state == 'present'
+
+- name: Include secret generation
+  ansible.builtin.include_tasks: secrets.yml
+  when: guacamole_standalone_state == 'present'
+
+- name: Include file synchronization
+  ansible.builtin.include_tasks: sync_files.yml
+  when: guacamole_standalone_state == 'present'
+
+- name: Include configuration generation
+  ansible.builtin.include_tasks: generate_config.yml
+  when: guacamole_standalone_state == 'present'
+
+- name: Include deployment tasks
+  ansible.builtin.include_tasks: deploy.yml
+  when: guacamole_standalone_state == 'present'
+
+- name: Include backup configuration
+  ansible.builtin.include_tasks: backup.yml
+  when: guacamole_standalone_state == 'present'
+
+- name: Include removal tasks
+  ansible.builtin.include_tasks: remove.yml
+  when: guacamole_standalone_state == 'absent'

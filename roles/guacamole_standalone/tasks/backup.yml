@@ -1,0 +1,29 @@
+---
+# =============================================================================
+# GUACAMOLE STANDALONE - Backup Cron Configuration
+# =============================================================================
+
+- name: Configure daily backup cron job
+  ansible.builtin.cron:
+    name: "guacamole-standalone-backup"
+    hour: "{{ guacamole_standalone_backup_cron_hour }}"
+    minute: "{{ guacamole_standalone_backup_cron_minute }}"
+    job: "{{ guacamole_standalone_install_dir }}/backup.sh >> /var/log/guacamole-backup.log 2>&1"
+    user: root
+    state: present
+
+- name: Ensure backup log file exists
+  ansible.builtin.file:
+    path: /var/log/guacamole-backup.log
+    state: touch
+    mode: '0644'
+    modification_time: preserve
+    access_time: preserve
+
+- name: Display backup configuration
+  ansible.builtin.debug:
+    msg:
+      - "Backup configured: daily at {{ guacamole_standalone_backup_cron_hour }}:{{ guacamole_standalone_backup_cron_minute }}"
+      - "Destination: {{ guacamole_standalone_save_dir }}"
+      - "Retention: {{ guacamole_standalone_backup_retention_days }} days"
+      - "Log: /var/log/guacamole-backup.log"

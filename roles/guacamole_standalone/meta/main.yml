@@ -1,0 +1,34 @@
+---
+# =============================================================================
+# GUACAMOLE STANDALONE ROLE - Metadata
+# =============================================================================
+
+galaxy_info:
+  role_name: guacamole_standalone
+  author: Portail Securise Team
+  description: Deploy standalone Guacamole with OIDC + JSON Auth + Credential Vault on a dedicated VM
+  license: MIT
+  min_ansible_version: "2.12"
+
+  platforms:
+    - name: Debian
+      versions:
+        - bullseye
+        - bookworm
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+
+  galaxy_tags:
+    - guacamole
+    - bastion
+    - rdp
+    - ssh
+    - vnc
+    - oidc
+    - docker
+    - standalone
+
+dependencies:
+  - role: docker_setup

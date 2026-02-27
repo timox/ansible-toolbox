@@ -1,0 +1,79 @@
+---
+# =============================================================================
+# GUACAMOLE STANDALONE - Deployment via Docker Compose
+# =============================================================================
+
+- name: Build Docker images
+  ansible.builtin.command:
+    cmd: docker compose build --parallel
+    chdir: "{{ guacamole_standalone_install_dir }}"
+  register: docker_build
+  changed_when: "'writing image' in docker_build.stderr or 'exporting layers' in docker_build.stderr"
+
+- name: Deploy Guacamole Standalone via Docker Compose
+  community.docker.docker_compose_v2:
+    project_src: "{{ guacamole_standalone_install_dir }}"
+    project_name: guacamole-standalone
+    env_files:
+      - "{{ guacamole_standalone_install_dir }}/.env"
+    state: present
+  register: guacamole_standalone_deploy
+  changed_when: guacamole_standalone_deploy.actions | length > 0
+
+- name: Wait for guacamole-db to be healthy
+  ansible.builtin.command: >
+    docker inspect --format='{{ '{{' }}.State.Health.Status{{ '}}' }}' guacamole-db
+  register: db_health
+  until: db_health.stdout == 'healthy'
+  retries: "{{ guacamole_standalone_health_check_retries }}"
+  delay: "{{ guacamole_standalone_health_check_timeout }}"
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+
+- name: Wait for guacamole-daemon to be healthy
+  ansible.builtin.command: >
+    docker inspect --format='{{ '{{' }}.State.Health.Status{{ '}}' }}' guacamole-daemon
+  register: daemon_health
+  until: daemon_health.stdout == 'healthy'
+  retries: "{{ guacamole_standalone_health_check_retries }}"
+  delay: "{{ guacamole_standalone_health_check_timeout }}"
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+
+- name: Wait for guacamole-web to be healthy
+  ansible.builtin.command: >
+    docker inspect --format='{{ '{{' }}.State.Health.Status{{ '}}' }}' guacamole-web
+  register: web_health
+  until: web_health.stdout == 'healthy'
+  retries: "{{ guacamole_standalone_health_check_retries }}"
+  delay: "{{ guacamole_standalone_health_check_timeout }}"
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+
+- name: Wait for guac-portal to be healthy
+  ansible.builtin.command: >
+    docker inspect --format='{{ '{{' }}.State.Health.Status{{ '}}' }}' guac-portal
+  register: portal_health
+  until: portal_health.stdout == 'healthy'
+  retries: "{{ guacamole_standalone_health_check_retries }}"
+  delay: "{{ guacamole_standalone_health_check_timeout }}"
+  changed_when: false
+  failed_when: false
+  when: not ansible_check_mode
+
+- name: Display deployment status
+  ansible.builtin.debug:
+    msg:
+      - "Guacamole Standalone deployment complete"
+      - "Portal: {{ guacamole_standalone_public_url }}"
+      - "Guacamole: {{ guacamole_standalone_public_url }}/guacamole/"
+      - "Authentication: OIDC via {{ keycloak_issuer }}"
+      - "Data: {{ guacamole_standalone_data_dir }}"
+      - "Backups: {{ guacamole_standalone_save_dir }}"
+      - "guacamole-db: {{ db_health.stdout | default('skipped') }}"
+      - "guacamole-daemon: {{ daemon_health.stdout | default('skipped') }}"
+      - "guacamole-web: {{ web_health.stdout | default('skipped') }}"
+      - "guac-portal: {{ portal_health.stdout | default('skipped') }}"

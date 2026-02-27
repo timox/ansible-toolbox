@@ -1,0 +1,68 @@
+---
+# =============================================================================
+# GUACAMOLE STANDALONE ROLE - Default Variables
+# =============================================================================
+# Deploiement Guacamole autonome sur VM separee (OIDC + JSON Auth + Vault)
+# Override: group_vars, host_vars, ou playbook vars
+
+# Service state
+guacamole_standalone_state: present  # present or absent
+
+# --- Versions ---
+guacamole_standalone_version: "1.6.0"
+guacamole_standalone_postgres_version: "15.10-alpine"
+guacamole_standalone_node_version: "20"
+
+# --- Chemins ---
+guacamole_standalone_data_dir: /data
+guacamole_standalone_save_dir: /save
+guacamole_standalone_install_dir: /opt/guacamole-standalone
+guacamole_standalone_source_dir: "{{ playbook_dir }}/../environments/prod/guacamole-standalone"
+
+# --- OIDC (Keycloak) ---
+guacamole_standalone_oidc_client_id: guacamole-standalone
+# guacamole_standalone_oidc_client_secret: set in vault
+
+# --- Reseau ---
+guacamole_standalone_portal_port: 3000
+guacamole_standalone_guacamole_port: 8080
+
+# --- JVM Tomcat ---
+guacamole_standalone_java_xms: 512m
+guacamole_standalone_java_xmx: 2g
+guacamole_standalone_java_gc: G1GC
+
+# --- Logging ---
+guacamole_standalone_log_level: info
+guacamole_standalone_log_max_size: 20m
+guacamole_standalone_log_max_file: "5"
+guacamole_standalone_guacd_log_level: info
+
+# --- PostgreSQL ---
+guacamole_standalone_db_name: guacamole_db
+guacamole_standalone_db_user: guacamole_user
+guacamole_standalone_postgres_max_connections: 60
+guacamole_standalone_postgres_max_connections_per_user: 6
+
+# --- Guacamole properties ---
+guacamole_standalone_extension_priority: "json, openid, jdbc"
+guacamole_standalone_oidc_scope: "openid email profile groups"
+guacamole_standalone_oidc_username_claim: preferred_username
+guacamole_standalone_oidc_groups_claim: groups
+guacamole_standalone_oidc_allowed_clock_skew: 30
+guacamole_standalone_oidc_max_token_validity: 480
+guacamole_standalone_enable_websocket: true
+guacamole_standalone_api_session_timeout: 28800
+guacamole_standalone_available_languages: "fr, en"
+
+# --- Credential vault ---
+guacamole_standalone_credentials_expiry_hours: 8
+
+# --- Backup ---
+guacamole_standalone_backup_retention_days: 7
+guacamole_standalone_backup_cron_hour: "2"
+guacamole_standalone_backup_cron_minute: "0"
+
+# --- Health check ---
+guacamole_standalone_health_check_timeout: 30
+guacamole_standalone_health_check_retries: 6

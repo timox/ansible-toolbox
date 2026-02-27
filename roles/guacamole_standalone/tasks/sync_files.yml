@@ -1,0 +1,28 @@
+---
+# =============================================================================
+# GUACAMOLE STANDALONE - Synchronize project files to target VM
+# =============================================================================
+
+- name: Synchronize guacamole-standalone project to target
+  ansible.posix.synchronize:
+    src: "{{ guacamole_standalone_source_dir }}/"
+    dest: "{{ guacamole_standalone_install_dir }}/"
+    delete: true
+    rsync_opts:
+      - "--exclude=.env"
+      - "--exclude=.git"
+      - "--exclude=node_modules"
+      - "--exclude=data"
+  register: sync_result
+
+- name: Ensure scripts are executable
+  ansible.builtin.file:
+    path: "{{ guacamole_standalone_install_dir }}/{{ item }}"
+    mode: '0755'
+  loop:
+    - deploy.sh
+    - backup.sh
+    - prepare-vm.sh
+    - guacamole/guacamole-entrypoint.sh
+    - guacamole/guacd-entrypoint.sh
+    - guacamole/scripts/manage-connections.sh

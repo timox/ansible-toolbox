@@ -1,0 +1,35 @@
+---
+# =============================================================================
+# GUACAMOLE STANDALONE - Removal Tasks
+# =============================================================================
+
+- name: Stop Guacamole Standalone services via Docker Compose
+  community.docker.docker_compose_v2:
+    project_src: "{{ guacamole_standalone_install_dir }}"
+    project_name: guacamole-standalone
+    state: absent
+  register: guacamole_standalone_remove
+  changed_when: guacamole_standalone_remove.actions | length > 0
+  failed_when: false
+
+- name: Remove backup cron job
+  ansible.builtin.cron:
+    name: "guacamole-standalone-backup"
+    state: absent
+
+- name: Remove .env configuration
+  ansible.builtin.file:
+    path: "{{ guacamole_standalone_install_dir }}/.env"
+    state: absent
+
+- name: Remove generated guacamole.properties
+  ansible.builtin.file:
+    path: "{{ guacamole_standalone_data_dir }}/config/guacamole.properties"
+    state: absent
+
+- name: Display removal status
+  ansible.builtin.debug:
+    msg:
+      - "Guacamole Standalone services stopped and configuration removed"
+      - "Data directories preserved at {{ guacamole_standalone_data_dir }}"
+      - "Backups preserved at {{ guacamole_standalone_save_dir }}"
